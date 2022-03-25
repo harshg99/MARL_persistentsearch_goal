@@ -1,4 +1,6 @@
 wheel
+h5py
+typing-extensions
 gym[atari]
 cython          #==0.29.0
 numpy           #==1.19.0
@@ -7,10 +9,10 @@ psutil          ==5.8.0
 opencv-python   #==4.1.0.25
 tabulate        ==0.8.3
 llvmlite
-numba           ==0.52.0
+numba           #==0.52.0
 cloudpickle     ==1.6.0
 tqdm            ==4.32.2
-joblib          ==0.13.2
+joblib          #==0.13.2
 dill            ==0.3.3
 progressbar2    ==3.53.1
 scikit-learn    #==0.24.0
