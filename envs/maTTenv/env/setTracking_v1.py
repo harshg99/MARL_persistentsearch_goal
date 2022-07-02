@@ -12,14 +12,17 @@ from envs.maTTenv.env.maTracking_Base import maTrackingBase
 """
 Target Tracking Environments for Reinforcement Learning.
 [Variables]
+
 d: radial coordinate of a belief target in the learner frame
 alpha : angular coordinate of a belief target in the learner frame
 ddot : radial velocity of a belief target in the learner frame
 alphadot : angular velocity of a belief target in the learner frame
 Sigma : Covariance of a belief target
+
 [Environment Description]
 Varying number of agents, varying number of randomly moving targets
 No obstacles
+
 setTrackingEnv0 : Double Integrator Target model with KF belief tracker
     obs state: [d, alpha, ddot, alphadot, logdet(Sigma), observed] *nb_targets
             where nb_targets and nb_agents vary between a range
@@ -27,16 +30,18 @@ setTrackingEnv0 : Double Integrator Target model with KF belief tracker
             num_agents describes the upperbound on possible number of agents in env
     Target : Double Integrator model, [x,y,xdot,ydot]
     Belief Target : KF, Double Integrator model
+
 """
 
-class setTrackingEnv0(maTrackingBase):
+class setTrackingEnv1(maTrackingBase):
 
     def __init__(self, num_agents=1, num_targets=2, map_name='empty', 
                         is_training=True, known_noise=True, **kwargs):
         super().__init__(num_agents=num_agents, num_targets=num_targets,
                         map_name=map_name, is_training=is_training)
 
-        self.id = 'setTracking-v0'
+        self.id = 'setTracking-v1'
+        self.metadata = self.id
         self.nb_agents = num_agents #only for init, will change with reset()
         self.nb_targets = num_targets #only for init, will change with reset()
         self.agent_dim = 3
@@ -50,7 +55,9 @@ class setTrackingEnv0(maTrackingBase):
         rel_vel_limit = METADATA['target_vel_limit'] + METADATA['action_v'][0] # Maximum relative speed
         self.limit['state'] = [np.array(([0.0, -np.pi, -rel_vel_limit, -10*np.pi, -50.0, 0.0])),
                                np.array(([600.0, np.pi, rel_vel_limit, 10*np.pi, 50.0, 2.0]))]
-        self.observation_space = spaces.Box(self.limit['state'][0], self.limit['state'][1], dtype=np.float32)
+        observation_space = spaces.Box(self.limit['state'][0], self.limit['state'][1], dtype=np.float32)
+        self.observation_space = {f"agent-{i}":observation_space for i in range(self.nb_agents)}
+        self.observation_space = spaces.Dict(self.observation_space)
         self.targetA = np.concatenate((np.concatenate((np.eye(2), self.sampling_period*np.eye(2)), axis=1), 
                                         [[0,0,1,0],[0,0,0,1]]))
         self.target_noise_cov = METADATA['const_q'] * np.concatenate((
@@ -103,12 +110,6 @@ class setTrackingEnv0(maTrackingBase):
         Return an observation state dict with agent ids (keys) that refer to their observation
         """
         self.rng = np.random.default_rng()
-        try: 
-            self.nb_agents = kwargs['nb_agents']
-            self.nb_targets = kwargs['nb_targets']
-        except:
-            self.nb_agents = np.random.randint(1, self.num_agents)
-            self.nb_targets = np.random.randint(1, self.num_targets)
         obs_dict = {}
         init_pose = self.get_init_pose(**kwargs)
         # Initialize agents
@@ -186,7 +187,7 @@ class setTrackingEnv0(maTrackingBase):
         # Get all rewards after all agents and targets move (t -> t+1)
         reward, done, mean_nlogdetcov = self.get_reward(observed, self.is_training)
         reward_dict['__all__'], done_dict['__all__'], info_dict['mean_nlogdetcov'] = reward, done, mean_nlogdetcov
-        return obs_dict, reward_dict, done_dict, info_dict
+        return obs_dict, reward, done_dict, info_dict
 
 def reward_fun(nb_targets, belief_targets, is_training=True, c_mean=0.1):
     detcov = [LA.det(b_target.cov) for b_target in belief_targets[:nb_targets]]
