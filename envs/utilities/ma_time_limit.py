@@ -14,6 +14,8 @@ class maTimeLimit(gym.Wrapper):
             self.env.spec.max_episode_steps = max_episode_steps
         self._max_episode_steps = max_episode_steps
         self._elapsed_steps = None
+        #assert max_episode_steps, f"env spec {self.env.spec}"
+        print(self._max_episode_steps)
 
     def step(self, action):
         assert self._elapsed_steps is not None, "Cannot call env.step() before calling reset()"

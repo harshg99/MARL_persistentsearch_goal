@@ -80,6 +80,7 @@ target/
 
 # Jupyter Notebook
 .ipynb_checkpoints
+*.ipynb
 
 # IPython
 profile_default/
@@ -109,7 +110,7 @@ celerybeat.pid
 .env
 .venv
 venv/
-ENV/
+# ENV/
 env.bak/
 venv.bak/
 
@@ -130,3 +131,7 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+
+# runs
+algos/maTT/runs/
+algos/maTT/wandb/
