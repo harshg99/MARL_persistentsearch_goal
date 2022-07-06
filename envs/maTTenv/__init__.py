@@ -35,7 +35,7 @@ def make(env_name, render=False, figID=0, record=False, directory='',
     else:
         raise ValueError('No such environment exists.')
 
-    
+    # import pdb; pdb.set_trace()
     
     env = env0
     if render:
