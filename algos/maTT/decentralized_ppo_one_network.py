@@ -17,6 +17,7 @@ import os
 import random
 import time
 from distutils.util import strtobool
+from tqdm import tqdm
 
 import gym
 from stable_baselines.common.cmd_util import make_vec_env
@@ -100,12 +101,17 @@ def decentralized_ppo(envs, args, run_name):
 
     device = torch.device("cuda" if torch.cuda.is_available() and args.cuda else "cpu")
 
+    # env setup
+    # envs = make_vec_env(env_fn, n_envs=args.num_envs, vec_env_cls=gym.vector.SyncVectorEnv)
     
     assert isinstance(envs.single_action_space, gym.spaces.Discrete), "only discrete action space is supported"
 
-    agent_networks = {f"agent-{i}":PPO(envs) for i in range(args.nb_agents)}
-    optimizers = {key: optim.Adam(agent_networks[key].parameters(), lr=args.learning_rate, eps=1e-5) for key in agent_networks.keys()}
-    
+    agent_network = PPO(envs)
+    optimizer = optim.Adam(agent_network.parameters(), lr=args.learning_rate, eps=1e-5)
+    # agent = Agent(envs).to(device)
+    # optimizer = optim.Adam(agent.parameters(), lr=args.learning_rate, eps=1e-5)
+
+    # ALGO Logic: Storage setup
     """
     A single obs, actions, logprob, done, value
 
@@ -145,17 +151,15 @@ def decentralized_ppo(envs, args, run_name):
     next_done = torch.zeros(args.num_envs).to(device)
     num_updates = args.total_timesteps // args.batch_size
 
-    for update in range(1, num_updates + 1):
+    for update in tqdm(range(1, num_updates + 1)):
         # Annealing the rate if instructed to do so.
         if args.anneal_lr:
             frac = 1.0 - (update - 1.0) / num_updates
             lrnow = frac * args.learning_rate
-            for agent_id in optimizers.keys():
-                optimizers[agent_id].param_groups[0]["lr"] = lrnow
+            #for agent_id in optimizers.keys():
+            optimizer.param_groups[0]["lr"] = lrnow
 
         for step in range(0, args.num_steps):
-            if args.render:
-                envs.envs[0].render()
             global_step += 1 * args.num_envs
             for i, agent_id in enumerate(next_obs.keys()):
                 obs[step, :, i] = torch.from_numpy(next_obs[agent_id])
@@ -163,13 +167,16 @@ def decentralized_ppo(envs, args, run_name):
             # ALGO LOGIC: action logic
             action_dict = [{} for _ in range(args.num_envs)]
             with torch.no_grad():
-                for i, agent_id in enumerate(agent_networks.keys()):
-                    action, logprob, _, value = agent_networks[agent_id].get_action_and_value(next_obs[agent_id])
-                    for j in range(action.shape[0]):
+                for i, agent_id in enumerate(next_obs.keys()):
+                    action, logprob, _, value = agent_network.get_action_and_value(next_obs[agent_id])
+                    for j in range(action.shape[0]): # num_envs
                         action_dict[j][agent_id] = action[j].item()
                     actions[step, :, i] = action.to(device)
                     logprobs[step, :, i] = logprob.to(device)
                     values[step, :, i] = value.view(-1).to(device)
+            
+            if args.render:
+                envs.envs[0].render()
             # TRY NOT TO MODIFY: execute the game and log data.
             next_obs, reward, done, info = envs.step(action_dict)
             rewards[step] = torch.tensor(reward).to(device).view(-1)
@@ -186,10 +193,10 @@ def decentralized_ppo(envs, args, run_name):
         # bootstrap value if not done
         advantages = torch.zeros((args.num_steps, args.num_envs, args.nb_agents))
         returns = torch.zeros((args.num_steps, args.num_envs, args.nb_agents))
-        for i, agent_id in enumerate(agent_networks.keys()): # 1st problem: is how to deal with multiple agents?
+        for i, agent_id in enumerate(next_obs.keys()): # 1st problem: is how to deal with multiple agents?
         # how to bootstrap with multiple agents and a global reward
             with torch.no_grad():
-                next_value = agent_networks[agent_id].get_value(next_obs[agent_id]).reshape(1, -1)
+                next_value = agent_network.get_value(next_obs[agent_id]).reshape(1, -1)
                 if args.gae:
                     lastgaelam = 0
                     for t in reversed(range(args.num_steps)):
@@ -230,7 +237,7 @@ def decentralized_ppo(envs, args, run_name):
                     end = start + args.minibatch_size
                     mb_inds = b_inds[start:end]
                     # logprobs are being compared. make sure the log probs are referencing the same targets
-                    _, newlogprob, entropy, newvalue = agent_networks[agent_id].get_action_and_value(b_obs[mb_inds], b_actions.long()[mb_inds]) # b_obs[mb_inds] --> (64, num_targets, observation.dim)
+                    _, newlogprob, entropy, newvalue = agent_network.get_action_and_value(b_obs[mb_inds], b_actions.long()[mb_inds]) # b_obs[mb_inds] --> (64, num_targets, observation.dim)
                     logratio = newlogprob - b_logprobs[mb_inds]
                     ratio = logratio.exp()
 
@@ -267,10 +274,10 @@ def decentralized_ppo(envs, args, run_name):
                     entropy_loss = entropy.mean()
                     loss = pg_loss - args.ent_coef * entropy_loss + v_loss * args.vf_coef
 
-                    optimizers[agent_id].zero_grad()
+                    optimizer.zero_grad()
                     loss.backward()
-                    nn.utils.clip_grad_norm_(agent_networks[agent_id].parameters(), args.max_grad_norm)
-                    optimizers[agent_id].step()
+                    nn.utils.clip_grad_norm_(agent_network.parameters(), args.max_grad_norm)
+                    optimizer.step()
 
                 if args.target_kl is not None:
                     if approx_kl > args.target_kl:
@@ -281,7 +288,7 @@ def decentralized_ppo(envs, args, run_name):
         explained_var = np.nan if var_y == 0 else 1 - np.var(y_true - y_pred) / var_y
 
         # TRY NOT TO MODIFY: record rewards for plotting purposes
-        [writer.add_scalar("charts/learning_rate", optimizers[key].param_groups[0]["lr"], global_step) for key in optimizers.keys()]
+        writer.add_scalar("charts/learning_rate", optimizer.param_groups[0]["lr"], global_step)
         writer.add_scalar("losses/value_loss", v_loss.item(), global_step)
         writer.add_scalar("losses/policy_loss", pg_loss.item(), global_step)
         writer.add_scalar("losses/entropy", entropy_loss.item(), global_step)

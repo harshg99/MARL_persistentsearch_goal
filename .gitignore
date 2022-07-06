@@ -1,6 +1,10 @@
 #repo specific ignores
 results/
-
+runs/
+wandb/
+algos/maTT/results/
+algos/maTT/runs/
+algos/maTT/wandb/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
@@ -132,6 +136,5 @@ dmypy.json
 # Pyre type checker
 .pyre/
 
-# runs
-algos/maTT/runs/
-algos/maTT/wandb/
+#macOS
+*.DS_Store*

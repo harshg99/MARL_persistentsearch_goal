@@ -19,7 +19,7 @@ class Display2D(Wrapper):
         self.figID = figID # figID = 0 : train, figID = 1 : test
         """ If used in run_maTracking to debug: self.env_core = env
             if used in visualize_ma for normal use: self.env_core = env.env"""
-        self.env_core = env.env
+        self.env_core = env # .env
         self.bin = self.env_core.MAP.mapres
         if self.env_core.MAP.map is None:
             self.map = np.zeros(self.env_core.MAP.mapdim)
@@ -119,6 +119,10 @@ class Display2D(Wrapper):
         return self.env.reset(**kwargs)
 
 class Video2D(Wrapper):
+    """
+    Any Broken Pipe Error is because FFMpegWriter is a pipe-based writer. There is no good debugging tool mechanism.
+    Carefully examine code to find error.
+    """
     def __init__(self, env, dirname = '', skip = 1, dpi=80, local_view=False):
         super(Video2D, self).__init__(env)
         self.local_view = local_view

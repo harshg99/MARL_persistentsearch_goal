@@ -1,6 +1,5 @@
 from asyncio.proactor_events import _ProactorDuplexPipeTransport
 import pdb, argparse, os, datetime, json, pickle
-from algos.maTT.decentralized_ppo import decentralized_ppo
 import torch
 import torch.nn as nn
 
@@ -54,13 +53,13 @@ def parse_args():
     # Algorithm specific arguments
     #parser.add_argument("--env-id", type=str, default="CartPole-v1",
     #    help="the id of the environment")
-    parser.add_argument("--total_timesteps", type=int, default=20000000,
+    parser.add_argument("--total_timesteps", type=int, default=2000000,
         help="total timesteps of the experiments")
     parser.add_argument("--learning_rate", type=float, default=2.5e-4,
         help="the learning rate of the optimizer")
     parser.add_argument("--num_envs", type=int, default=4,
         help="the number of parallel game environments")
-    parser.add_argument("--num_steps", type=int, default=256,
+    parser.add_argument("--num_steps", type=int, default=128,
         help="the number of steps to run in each environment per policy rollout")
     parser.add_argument("--anneal_lr", type=lambda x: bool(strtobool(x)), default=True, nargs="?", const=True,
         help="Toggle learning rate annealing for policy and value networks")
@@ -88,8 +87,9 @@ def parse_args():
         help="the maximum norm for the gradient clipping")
     parser.add_argument("--target_kl", type=float, default=None,
         help="the target KL divergence threshold")
-
-        
+    parser.add_argument('--one_network', action='store_true')
+    parser.set_defaults(one_network=False)
+    
     ## maTT
     
     parser.add_argument('--env', help='environment ID', default='setTracking-v1')
@@ -126,7 +126,6 @@ def parse_args():
 
     parser.add_argument('--torch_threads', type=int, default=1)
     parser.add_argument('--amp', type=int, default=0)
-
     args = parser.parse_args()
     args.batch_size = int(args.num_envs * args.num_steps)
     args.minibatch_size = int(args.batch_size // args.num_minibatches)
@@ -136,28 +135,28 @@ def parse_args():
 
 
 def train(save_dir, args):
-    save_dir_0 = os.path.join(save_dir, 'seed_%d'%args.seed)
-
+    run_name = save_dir.split(os.sep)[-1]
+    assert os.path.exists(save_dir)
     env = envs.make(args.env,
                     'ma_target_tracking',
                     render=bool(args.render),
                     record=bool(args.record),
-                    directory=save_dir_0,
+                    directory=save_dir,
                     map_name=args.map,
                     num_agents=args.nb_agents,
                     num_targets=args.nb_targets,
                     is_training=True,
+                    num_envs=args.num_envs
                     )
 
     # Create env function
-    env_fn = lambda : env
-    
-    #Training function
-    #      model_kwargs = dict(dim_hidden=args.hiddens)
-    #logger_kwargs = dict(output_dir=save_dir_0, exp_name=save_dir_0)
-    #model = core.DeepSetmodel
-
-    decentralized_ppo(env_fn, args)
+    # env_fn = lambda : env
+    if args.one_network:
+        from algos.maTT.decentralized_ppo_one_network import decentralized_ppo
+        decentralized_ppo(env, args, run_name)
+    else:
+        from algos.maTT.decentralized_ppo import decentralized_ppo
+        decentralized_ppo(env, args, run_name)
 
 def test(args):
     from algos.maTT.evaluation import Test, load_pytorch_policy
@@ -210,7 +209,9 @@ def testbehavior(args):
 if __name__ == '__main__':
     args = parse_args()
     if args.mode == 'train':
-        save_dir = os.path.join(args.log_dir, '_'.join([args.env, datetime.datetime.now().strftime("%m%d%H%M")]))
+        date = datetime.datetime.now().strftime("%m%d%H%M")
+        run_name = f"{args.env}__{args.seed}__{date}"
+        save_dir = os.path.join(args.log_dir, run_name)
         if not os.path.exists(save_dir):
             os.makedirs(save_dir)
         else:

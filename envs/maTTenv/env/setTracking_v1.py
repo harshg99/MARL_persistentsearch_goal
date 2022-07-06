@@ -189,7 +189,7 @@ class setTrackingEnv1(maTrackingBase):
         # Get all rewards after all agents and targets move (t -> t+1)
         reward, done, mean_nlogdetcov = self.get_reward(observed, self.is_training)
         done_dict['__all__'], info_dict['mean_nlogdetcov'] = done, mean_nlogdetcov
-        return obs_dict, reward, done_dict, info_dict
+        return obs_dict, reward, done, info_dict
 
 def reward_fun(nb_targets, belief_targets, is_training=True, c_mean=0.1):
     detcov = [LA.det(b_target.cov) for b_target in belief_targets[:nb_targets]]
