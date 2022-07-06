@@ -27,49 +27,7 @@ import torch.optim as optim
 from torch.distributions.categorical import Categorical
 from torch.utils.tensorboard import SummaryWriter
 
-def layer_init(layer, std=np.sqrt(2), bias_const=0.0):
-    torch.nn.init.orthogonal_(layer.weight, std)
-    torch.nn.init.constant_(layer.bias, bias_const)
-    return layer
-
-class PPO(nn.Module):
-    def __init__(self, envs):
-        super().__init__()
-        self.envs = envs
-        key = list(envs.single_observation_space.keys())[0]
-        self.critic = nn.Sequential(
-            layer_init(nn.Linear(np.array(envs.single_observation_space[key].shape).prod(), 64)),
-            nn.Tanh(),
-            layer_init(nn.Linear(64, 64)),
-            nn.Tanh(),
-            layer_init(nn.Linear(64, 1), std=1.0),
-        )
-        self.actor = nn.Sequential(
-            layer_init(nn.Linear(np.array(envs.single_observation_space[key].shape).prod(), 64)),
-            nn.Tanh(),
-            layer_init(nn.Linear(64, 64)),
-            nn.Tanh(),
-            layer_init(nn.Linear(64, envs.single_action_space.n), std=0.01),
-        )
-
-    def get_value(self, x):
-        if isinstance(x, np.ndarray):
-            x = torch.from_numpy(x)
-        x = x.view(-1, x.shape[-2] * x.shape[-1])
-        return self.critic(x)
-
-    def get_action_and_value(self, x, action=None):
-        if isinstance(x, np.ndarray):
-            x = torch.from_numpy(x)
-        x = x.view(-1, x.shape[-2] * x.shape[-1])
-        logits = self.actor(x)
-        probs = Categorical(logits=logits)
-        if action is None:
-            action = probs.sample()
-        return action, probs.log_prob(action), probs.entropy(), self.critic(x)
-
-
-def decentralized_ppo(envs, args, run_name):
+def decentralized_ppo(envs, model, args, run_name):
     """
     env_fn: 
         lambda: env
@@ -103,7 +61,7 @@ def decentralized_ppo(envs, args, run_name):
     
     assert isinstance(envs.single_action_space, gym.spaces.Discrete), "only discrete action space is supported"
 
-    agent_networks = {f"agent-{i}":PPO(envs) for i in range(args.nb_agents)}
+    agent_networks = {f"agent-{i}":model(envs) for i in range(args.nb_agents)}
     optimizers = {key: optim.Adam(agent_networks[key].parameters(), lr=args.learning_rate, eps=1e-5) for key in agent_networks.keys()}
     
     """

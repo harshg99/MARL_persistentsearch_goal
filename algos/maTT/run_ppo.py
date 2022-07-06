@@ -151,12 +151,13 @@ def train(save_dir, args):
 
     # Create env function
     # env_fn = lambda : env
+    model = core.PPO(env)
     if args.one_network:
         from algos.maTT.decentralized_ppo_one_network import decentralized_ppo
-        decentralized_ppo(env, args, run_name)
+        decentralized_ppo(env, model, args, run_name)
     else:
         from algos.maTT.decentralized_ppo import decentralized_ppo
-        decentralized_ppo(env, args, run_name)
+        decentralized_ppo(env, model, args, run_name)
 
 def test(args):
     from algos.maTT.evaluation import Test, load_pytorch_policy
