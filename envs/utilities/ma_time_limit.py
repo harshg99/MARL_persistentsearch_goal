@@ -50,6 +50,7 @@ class maTimeLimitVec(gym.Wrapper):
         observation, reward, done, info = self.env.step(action)
         self._elapsed_steps += 1
         if self._elapsed_steps >= self._max_episode_steps:
+            #from IPython import embed; embed()
             info['TimeLimit.truncated'] = not done.any()
             done = np.array([True for _ in range(self.env.num_envs)])
             # done = True       #og gym version

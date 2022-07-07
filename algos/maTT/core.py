@@ -119,9 +119,10 @@ class DeepSetmodel(nn.Module):
             return int(a)
 
 class PPO(nn.Module):
-    def __init__(self, envs):
+    def __init__(self, envs, args):
         super().__init__()
         self.envs = envs
+        self.args = args
         key = list(envs.single_observation_space.keys())[0]
         self.critic = nn.Sequential(
             layer_init(nn.Linear(np.array(envs.single_observation_space[key].shape).prod(), 64)),
@@ -137,16 +138,21 @@ class PPO(nn.Module):
             nn.Tanh(),
             layer_init(nn.Linear(64, envs.single_action_space.n), std=0.01),
         )
+        self.device = torch.device("cuda" if torch.cuda.is_available() and args.cuda else "cpu")
 
     def get_value(self, x):
         if isinstance(x, np.ndarray):
             x = torch.from_numpy(x)
+        if not x.is_cuda:
+            x = x.to(self.device)
         x = x.view(-1, x.shape[-2] * x.shape[-1])
         return self.critic(x)
 
     def get_action_and_value(self, x, action=None):
         if isinstance(x, np.ndarray):
             x = torch.from_numpy(x)
+        if not x.is_cuda:
+            x = x.to(self.device)
         x = x.view(-1, x.shape[-2] * x.shape[-1])
         logits = self.actor(x)
         probs = Categorical(logits=logits)

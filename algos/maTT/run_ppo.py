@@ -151,7 +151,7 @@ def train(save_dir, args):
 
     # Create env function
     # env_fn = lambda : env
-    model = core.PPO(env)
+    model = core.PPO(env, args)
     if args.one_network:
         from algos.maTT.decentralized_ppo_one_network import decentralized_ppo
         decentralized_ppo(env, model, args, run_name)

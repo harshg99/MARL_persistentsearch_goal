@@ -67,7 +67,7 @@ def decentralized_ppo(envs, model, args, run_name):
     
     assert isinstance(envs.single_action_space, gym.spaces.Discrete), "only discrete action space is supported"
 
-    agent_network = model
+    agent_network = model.to(device)
     optimizer = optim.Adam(agent_network.parameters(), lr=args.learning_rate, eps=1e-5)
     # agent = Agent(envs).to(device)
     # optimizer = optim.Adam(agent.parameters(), lr=args.learning_rate, eps=1e-5)
@@ -168,8 +168,8 @@ def decentralized_ppo(envs, model, args, run_name):
         
         #print(f"finished stepping {args.num_steps} in env")
         # bootstrap value if not done
-        advantages = torch.zeros((args.num_steps, args.num_envs, args.nb_agents))
-        returns = torch.zeros((args.num_steps, args.num_envs, args.nb_agents))
+        advantages = torch.zeros((args.num_steps, args.num_envs, args.nb_agents)).to(device)
+        returns = torch.zeros((args.num_steps, args.num_envs, args.nb_agents)).to(device)
         for i, agent_id in enumerate(next_obs.keys()): # 1st problem: is how to deal with multiple agents?
         # how to bootstrap with multiple agents and a global reward
             with torch.no_grad():
@@ -183,6 +183,7 @@ def decentralized_ppo(envs, model, args, run_name):
                         else:
                             nextnonterminal = 1.0 - dones[t + 1]
                             nextvalues = values[t + 1, :, i]
+                        #from IPython import embed; embed()
                         delta = rewards[t] + args.gamma * nextvalues * nextnonterminal - values[t, :, i]
                         advantages[t, :, i] = lastgaelam = delta + args.gamma * args.gae_lambda * nextnonterminal * lastgaelam
                     returns[:, :, i] = advantages[:, :, i] + values[:, :, i]
