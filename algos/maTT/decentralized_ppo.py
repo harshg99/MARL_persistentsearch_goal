@@ -17,6 +17,7 @@ import os
 import random
 import time
 from distutils.util import strtobool
+from tqdm import tqdm
 
 import gym
 from stable_baselines.common.cmd_util import make_vec_env
@@ -24,7 +25,6 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from torch.distributions.categorical import Categorical
 from torch.utils.tensorboard import SummaryWriter
 
 def decentralized_ppo(envs, model, args, run_name):
@@ -102,8 +102,9 @@ def decentralized_ppo(envs, model, args, run_name):
     next_obs = envs.reset()
     next_done = torch.zeros(args.num_envs).to(device)
     num_updates = args.total_timesteps // args.batch_size
-
-    for update in range(1, num_updates + 1):
+    ep_length = 0
+    save_freq = num_updates // 10
+    for update in tqdm(range(1, num_updates + 1)):
         # Annealing the rate if instructed to do so.
         if args.anneal_lr:
             frac = 1.0 - (update - 1.0) / num_updates
@@ -112,8 +113,7 @@ def decentralized_ppo(envs, model, args, run_name):
                 optimizers[agent_id].param_groups[0]["lr"] = lrnow
 
         for step in range(0, args.num_steps):
-            if args.render:
-                envs.envs[0].render()
+           
             global_step += 1 * args.num_envs
             for i, agent_id in enumerate(next_obs.keys()):
                 obs[step, :, i] = torch.from_numpy(next_obs[agent_id])
@@ -128,23 +128,26 @@ def decentralized_ppo(envs, model, args, run_name):
                     actions[step, :, i] = action.to(device)
                     logprobs[step, :, i] = logprob.to(device)
                     values[step, :, i] = value.view(-1).to(device)
+            if args.render:
+                envs.envs[0].render()
             # TRY NOT TO MODIFY: execute the game and log data.
             next_obs, reward, done, info = envs.step(action_dict)
             rewards[step] = torch.tensor(reward).to(device).view(-1)
             next_done = torch.Tensor(done).to(device)
-            if "episode" in info.keys():
-                assert torch.sum(next_done).item() == info["episode"].shape[0]
-                for env in range(args.num_envs):
-                    print(f"global_step={global_step}, episodic_return={info['episode'][env]['r']}")
-                    writer.add_scalar("charts/episodic_return", info["episode"][env]["r"], global_step)
-                    writer.add_scalar("charts/episodic_length", info["episode"][env]["l"], global_step)
+            if torch.sum(next_done).item() == args.num_envs:
+                for env_i in range(args.num_envs):
+                    print(f"global_step={global_step}, episodic_return_env={env_i}={torch.sum(rewards[step - ep_length:step, env_i]).item()}")
+                    writer.add_scalar(f"charts/episodic_return_env_{env_i}", torch.sum(rewards[step - ep_length:step, env_i]).item(), global_step)
+                writer.add_scalar("charts/episodic_length", ep_length, global_step)
+                ep_length = 0
+                envs.reset()
                 break
-        
+            ep_length += 1
         
         # bootstrap value if not done
         advantages = torch.zeros((args.num_steps, args.num_envs, args.nb_agents))
         returns = torch.zeros((args.num_steps, args.num_envs, args.nb_agents))
-        for i, agent_id in enumerate(agent_networks.keys()): # 1st problem: is how to deal with multiple agents?
+        for i, agent_id in enumerate(next_obs.keys()): # 1st problem: is how to deal with multiple agents?
         # how to bootstrap with multiple agents and a global reward
             with torch.no_grad():
                 next_value = agent_networks[agent_id].get_value(next_obs[agent_id]).reshape(1, -1)
@@ -234,6 +237,11 @@ def decentralized_ppo(envs, model, args, run_name):
                     if approx_kl > args.target_kl:
                         break
 
+        # model saving  
+        if update % save_freq == 0:
+            for key in agent_networks.keys():
+                torch.save(agent_networks[key].state_dict(), os.path.join("runs", run_name, f'model_{key}_{update}.pt'))
+        
         y_pred, y_true = b_values.cpu().numpy(), b_returns.cpu().numpy()
         var_y = np.var(y_true)
         explained_var = np.nan if var_y == 0 else 1 - np.var(y_true - y_pred) / var_y

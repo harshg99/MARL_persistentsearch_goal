@@ -43,7 +43,7 @@ def make(env_name, render=False, figID=0, record=False, directory='',
         env = Display2D(env, figID=figID)
     if record:
         from envs.maTTenv.display_wrapper import Video2D
-        env = Video2D(env, dirname = directory, dpi=20)
+        env = Video2D(env, dirname = directory)
     
     
     if "num_envs" in kwargs and kwargs["num_envs"] > 1:

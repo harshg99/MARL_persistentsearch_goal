@@ -27,10 +27,6 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.utils.tensorboard import SummaryWriter
 
-
-
-
-
 def decentralized_ppo(envs, model, args, run_name):
     """
     env_fn: 
@@ -62,15 +58,11 @@ def decentralized_ppo(envs, model, args, run_name):
 
     device = torch.device("cuda" if torch.cuda.is_available() and args.cuda else "cpu")
 
-    # env setup
-    # envs = make_vec_env(env_fn, n_envs=args.num_envs, vec_env_cls=gym.vector.SyncVectorEnv)
     
     assert isinstance(envs.single_action_space, gym.spaces.Discrete), "only discrete action space is supported"
 
     agent_network = model.to(device)
     optimizer = optim.Adam(agent_network.parameters(), lr=args.learning_rate, eps=1e-5)
-    # agent = Agent(envs).to(device)
-    # optimizer = optim.Adam(agent.parameters(), lr=args.learning_rate, eps=1e-5)
 
     # ALGO Logic: Storage setup
     """
@@ -112,16 +104,15 @@ def decentralized_ppo(envs, model, args, run_name):
     next_done = torch.zeros(args.num_envs).to(device)
     num_updates = args.total_timesteps // args.batch_size
     ep_length = 0
+    save_freq = num_updates // 10
     for update in tqdm(range(1, num_updates + 1)):
         # Annealing the rate if instructed to do so.
         if args.anneal_lr:
             frac = 1.0 - (update - 1.0) / num_updates
             lrnow = frac * args.learning_rate
-            #for agent_id in optimizers.keys():
             optimizer.param_groups[0]["lr"] = lrnow
 
         for step in range(0, args.num_steps):
-            #print(f"step {step}") 
             global_step += 1 * args.num_envs
             for i, agent_id in enumerate(next_obs.keys()):
                 obs[step, :, i] = torch.from_numpy(next_obs[agent_id])
@@ -139,14 +130,11 @@ def decentralized_ppo(envs, model, args, run_name):
             
             if args.render:
                 envs.envs[0].render()
-            # TRY NOT TO MODIFY: execute the game and log data.
-            #import pdb; pdb.set_trace()
+            # TRY NOT TO MODIFY: execute the game and log data.            
             next_obs, reward, done, info = envs.step(action_dict)
-            
             rewards[step] = torch.tensor(reward).to(device).view(-1)
             next_done = torch.Tensor(done).to(device)
             if torch.sum(next_done).item() == args.num_envs:
-                #from IPython import embed; embed()
                 for env_i in range(args.num_envs):
                     print(f"global_step={global_step}, episodic_return_env={env_i}={torch.sum(rewards[step - ep_length:step, env_i]).item()}")
                     writer.add_scalar(f"charts/episodic_return_env_{env_i}", torch.sum(rewards[step - ep_length:step, env_i]).item(), global_step)
@@ -154,19 +142,8 @@ def decentralized_ppo(envs, model, args, run_name):
                 ep_length = 0
                 envs.reset()
                 break
-            """if "episode" in info.keys():# and torch.sum(next_done).item() == args.num_envs:
-                print(info)
-                print(next_done)
-                from IPython import embed; embed()
-                assert torch.sum(next_done).item() == info["episode"].shape[0]
-                for env in range(args.num_envs):
-                    print(f"global_step={global_step}, episodic_return={info['episode'][env]['r']}")
-                    writer.add_scalar("charts/episodic_return", info["episode"][env]["r"], global_step)
-                    writer.add_scalar("charts/episodic_length", info["episode"][env]["l"], global_step)
-                break"""
             ep_length += 1
         
-        #print(f"finished stepping {args.num_steps} in env")
         # bootstrap value if not done
         advantages = torch.zeros((args.num_steps, args.num_envs, args.nb_agents)).to(device)
         returns = torch.zeros((args.num_steps, args.num_envs, args.nb_agents)).to(device)
@@ -260,6 +237,10 @@ def decentralized_ppo(envs, model, args, run_name):
                 if args.target_kl is not None:
                     if approx_kl > args.target_kl:
                         break
+
+        # model saving  
+        if update % save_freq == 0:
+            torch.save(agent_network.state_dict(), os.path.join("runs", run_name, f'model_{update}.pt'))
 
         y_pred, y_true = b_values.cpu().numpy(), b_returns.cpu().numpy()
         var_y = np.var(y_true)

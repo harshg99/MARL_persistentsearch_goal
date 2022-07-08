@@ -5,6 +5,7 @@ wandb/
 algos/maTT/results/
 algos/maTT/runs/
 algos/maTT/wandb/
+eval_seed1_emptyMed
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

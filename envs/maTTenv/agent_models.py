@@ -83,51 +83,6 @@ class AgentSE2(Agent):
 
         return is_col
 
-class DecentralizedPPOAgent(AgentSE2, nn.Module):
-
-    def __init__(self, args, agent_id, dim, sampling_period, limit, collision_func, margin=METADATA['margin'], policy=None):
-        # TODO: how can I get obs_dim, act_dim?
-        super(self, nn.Module).__init__()
-        super(self, AgentSE2).__init__(agent_id, dim, sampling_period, limit, collision_func, margin, policy)
-        
-        self.critic = nn.Sequential(
-            self._layer_init(nn.Linear(dim, 64)),
-            nn.Tanh(),
-            self._layer_init(nn.Linear(64, 64)),
-            nn.Tanh(),
-            self._layer_init(nn.Linear(64, 1), std=1.0),
-        )
-        self.actor = nn.Sequential(
-            self._layer_init(nn.Linear(dim, 64)),
-            nn.Tanh(),
-            self._layer_init(nn.Linear(64, 64)),
-            nn.Tanh(),
-            self._layer_init(nn.Linear(64, envs.single_action_space.n), std=0.01),
-        )
-        self.optimizer = optim.Adam(self.parameters(), lr=args.learning_rate, eps=1e-5)
-
-    def get_value(self, x):
-        return self.critic(x)
-
-    def get_action_and_value(self, x, action=None):
-        logits = self.actor(x)
-        probs = Categorical(logits=logits)
-        if action is None:
-            action = probs.sample()
-        return action, probs.log_prob(action), probs.entropy(), self.critic(x)
-
-    def _layer_init(self, layer, std=np.sqrt(2), bias_const=0.0):
-        torch.nn.init.orthogonal_(layer.weight, std)
-        torch.nn.init.constant_(layer.bias, bias_const)
-        return layer
-        
-    def reset(self, init_state):
-        super().reset(init_state)
-
-    def update(self, observation=None, margin_pos=None, col=False):
-        control_input = self.get_action_and_value(observation)
-        return super().update(control_input=control_input, margin_pos=margin_pos, col=col)
-
 def SE2Dynamics(x, dt, u):  
     assert(len(x)==3)          
     tw = dt * u[1] 
@@ -167,7 +122,7 @@ class AgentDoubleInt2D(Agent):
             new_state = self.collision_control(new_state)
 
         self.state = new_state
-        # self.range_check()
+        self.range_check()
 
     def collision_control(self, new_state):
         new_state[0] = self.state[0]

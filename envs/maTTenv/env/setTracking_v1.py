@@ -1,3 +1,4 @@
+from email.message import EmailMessage
 import os, copy, pdb
 import numpy as np
 from numpy import linalg as LA
@@ -200,4 +201,5 @@ def reward_fun(nb_targets, belief_targets, is_training=True, c_mean=0.1):
     if not(is_training):
         logdetcov = [np.log(LA.det(b_target.cov)) for b_target in belief_targets[:nb_targets]]
         mean_nlogdetcov = -np.mean(logdetcov)
+        # assert r_detcov_mean == mean_nlogdetcov
     return reward, False, mean_nlogdetcov

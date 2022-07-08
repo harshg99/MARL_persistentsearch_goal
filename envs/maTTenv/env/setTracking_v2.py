@@ -96,6 +96,7 @@ class setTrackingEnv2(maTrackingBase):
                         for i in range(self.num_targets)]
 
     def setup_belief_targets(self):
+        # self.global_belief_targets = # M target number of beliefs
         self.belief_targets = [[KFbelief(agent_id = f"agent-{i}_target-{j}",
                         dim=self.target_dim, limit=self.limit['target'], A=self.targetA,
                         W=self.target_noise_cov, obs_noise_func=self.observation_noise, 

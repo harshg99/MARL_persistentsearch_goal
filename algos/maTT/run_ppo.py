@@ -171,11 +171,11 @@ def test(args):
                     num_agents=args.nb_agents,
                     num_targets=args.nb_targets,
                     is_training=False,
-                    )    
+                    num_envs=args.num_envs
+                    )
 
     # Load saved policy
-    model_kwargs = dict(dim_hidden=args.hiddens)
-    model = core.DeepSetmodel(env.observation_space, env.action_space, **model_kwargs)
+    model = core.PPO(env)
     policy = load_pytorch_policy(args.log_dir, args.log_fname, model)
 
     # Testing environment
