@@ -24,7 +24,8 @@ METADATA_v1 = {
 METADATA_v2 = {   
         'version' : 1,
         'sensor_r': 10.0,
-        'fov' : 90,
+        'comms_r': 15.0,
+        'fov' : 360,
         'sensor_r_sd': 0.2, # sensor range noise.
         'sensor_b_sd': 0.01, # sensor bearing noise.
         'target_init_cov': 30.0, # initial target diagonal Covariance.

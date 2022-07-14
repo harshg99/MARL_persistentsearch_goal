@@ -9,7 +9,7 @@ from envs.maTTenv.agent_models import *
 from envs.maTTenv.belief_tracker import KFbelief
 from envs.maTTenv.metadata import METADATA
 from envs.maTTenv.env.maTracking_Base import maTrackingBase
-
+from copy import deepcopy
 """
 Target Tracking Environments for Reinforcement Learning.
 [Variables]
@@ -56,7 +56,9 @@ class setTrackingEnv2(maTrackingBase):
         rel_vel_limit = METADATA['target_vel_limit'] + METADATA['action_v'][0] # Maximum relative speed
         self.limit['state'] = [np.array(([0.0, -np.pi, -rel_vel_limit, -10*np.pi, -50.0, 0.0])),
                                np.array(([600.0, np.pi, rel_vel_limit, 10*np.pi, 50.0, 2.0]))]
-        
+
+        self.communication_range = METADATA['comms_r']
+
         observation_space = spaces.Box(np.tile(self.limit['state'][0], (self.num_targets, 1)), np.tile(self.limit['state'][1], (self.num_targets, 1)), dtype=np.float32)
         self.observation_space = {f"agent-{i}":observation_space for i in range(self.nb_agents)}
         self.observation_space = spaces.Dict(self.observation_space)
@@ -97,12 +99,15 @@ class setTrackingEnv2(maTrackingBase):
 
     def setup_belief_targets(self):
         # self.global_belief_targets = # M target number of beliefs
-        self.belief_targets = [[KFbelief(agent_id = f"agent-{i}_target-{j}",
+        self.belief_targets = [KFbelief(agent_id = 'target-' + str(i),
                         dim=self.target_dim, limit=self.limit['target'], A=self.targetA,
-                        W=self.target_noise_cov, obs_noise_func=self.observation_noise, 
+                        W=self.target_noise_cov, obs_noise_func=self.observation_noise,
                         collision_func=lambda x: map_utils.is_collision(self.MAP, x))
-                        for j in range(self.num_targets)]
-                        for i in range(self.num_agents)]
+                        for i in range(self.num_targets)]
+        # Initialise individual target beliefs for each agent
+
+        for index,agents in enumerate(self.agents):
+            agents.setupIndividualBelief(deepcopy(self.global_belief_targets))
 
     def get_reward(self, observed=None, is_training=True):
         return reward_fun(self.nb_targets, self.belief_targets, is_training)
@@ -188,6 +193,26 @@ class setTrackingEnv2(maTrackingBase):
             obs_dict[agent_id] = torch.Tensor(obs_dict[agent_id])
         return obs_dict
 
+    '''
+    Returns a dictionary of agents that are within communication range
+    '''
+    def communicate_graph(self):
+        agent_comms_dict = {}
+
+        for id,agentID in enumerate(self.agents):
+            for id2,agentID2 in enumerate(self.agents):
+                r, alpha = util.relative_distance_polar(agentID2.state[:2],
+                                                        xy_base=agentID.state[:2],
+                                                        theta_base=agentID.state[2])
+
+                if (r <= self.communication_range):
+                    if id not in agent_comms_dict.keys():
+                        agent_comms_dict[id] = [id2]
+                    else:
+                        agent_comms_dict[id].append(id2)
+
+        return  agent_comms_dict
+
     def step(self, action_dict):
         obs_dict = {}
         reward_dict = {}
@@ -217,8 +242,19 @@ class setTrackingEnv2(maTrackingBase):
                 if agent_id != ids:
                     margin_pos.append(np.array(self.agents[p].state[:2]))
             _ = self.agents[ii].update(action_vw, margin_pos)
-            
-            
+
+            #Communication
+            agent_graph = self.communicate_graph()
+
+            update_comm_beliefs = []
+
+            for agentid in agent_graph.keys():
+                comm_recv_beliefs = [self.agents[ID].Belief for ID in agent_graph[ID]]
+                update_comm_beliefs.append(self.agents[agentid].updateCommBelief(comm_recv_beliefs))
+
+            for agentid,updatedCommBelief in enumerate(update_comm_beliefs):
+                self.agents[agentid].setBelief(updatedCommBelief)
+
 
             # Update beliefs of targets
             for jj in range(self.nb_targets):
@@ -226,7 +262,13 @@ class setTrackingEnv2(maTrackingBase):
                 obs, z_t = self.observation(self.targets[jj], self.agents[ii])
                 observed[ii][jj] = obs
                 if obs: # if observed, update the target belief.
-                    self.belief_targets[ii][jj].update(z_t, self.agents[ii].state)
+
+                    #Update agents indivuudla be,liefs based on observation
+                    self.agents[ii].updateBelief(z_t)
+
+                    #Update global belief
+                    self.belief_targets[jj].update(z_t, self.agents[ii].state)
+
 
                 r_b, alpha_b = util.relative_distance_polar(self.belief_targets[ii][jj].state[:2],
                                         xy_base=self.agents[ii].state[:2], 
@@ -241,12 +283,16 @@ class setTrackingEnv2(maTrackingBase):
             obs_dict[agent_id] = torch.Tensor(obs_dict[agent_id])
             # shuffle obs to promote permutation invariance
             self.rng.shuffle(obs_dict[agent_id])
+
+
+
         # Get all rewards after all agents and targets move (t -> t+1)
         reward, done, mean_nlogdetcov = self.get_reward(observed, self.is_training)
         done_dict['__all__'], info_dict['mean_nlogdetcov'] = done, mean_nlogdetcov
         return obs_dict, reward, done_dict, info_dict
 
 def reward_fun(nb_targets, belief_targets, is_training=True, c_mean=0.1):
+    #TODO: reward should be per agent
     detcov = [[LA.det(b_target.cov) for b_target in belief_target] for belief_target in belief_targets]
     detcov = np.ravel(detcov)
     r_detcov_mean = - np.mean(np.log(detcov))

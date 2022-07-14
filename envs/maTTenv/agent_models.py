@@ -21,15 +21,46 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from torch.distributions.categorical import Categorical
+from copy import deepcopy
+from numpy import linalg as LA
 
 class Agent(object):
-    def __init__(self, agent_id, dim, sampling_period, limit, collision_func, margin=METADATA['margin']):
+    def __init__(self, agent_id, dim, sampling_period, limit, collision_func, margin=METADATA['margin'],KFBelief = None):
         self.agent_id = agent_id
         self.dim = dim
         self.sampling_period = sampling_period
         self.limit = limit
         self.collision_func = collision_func
         self.margin = margin
+        self.Belief = KFBelief
+
+    def setupBelief(self,Belief):
+        #List of belief over all targets
+        self.Belief = Belief
+
+    def updateBelief(self,z_t):
+        self.Belief.update(z_t,self.state)
+
+    def updateCommBelief(self,comms_recv_beliefs):
+        '''
+
+        :param comms_recv_beliefs: List of KF/UKF belifs from communicated agents
+        :return: intermediate update beliefs
+        '''
+
+        intermedBelief = deepcopy(self.Belief)
+        if len(comms_recv_beliefs)==0:
+            return intermedBelief
+
+        for targetId,targetBelief in enumerate(intermedBelief):
+            for neigh in range(len(comms_recv_beliefs)):
+                logdetCov = LA.det(targetBelief.cov)
+                commslogdetCov = LA.det(comms_recv_beliefs[neigh][targetId].cov)
+                if commslogdetCov<logdetCov:
+                    targetBelief.state = comms_recv_beliefs[neigh][targetId].state
+                    targetBelief.cov = comms_recv_beliefs[neigh][targetId].cov
+
+        return intermedBelief
 
     def range_check(self):
         self.state = np.clip(self.state, self.limit[0], self.limit[1])
@@ -38,7 +69,7 @@ class Agent(object):
         return self.collision_func(pos[:2])
 
     def margin_check(self, pos, target_pos):
-        return any(np.sqrt(np.sum((pos - target_pos)**2, axis=1)) < self.margin) # no update 
+        return any(np.sqrt(np.sum((pos - target_pos)**2, axis=1)) < self.margin) # no update
 
     def reset(self, init_state):
         self.state = init_state

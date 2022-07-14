@@ -11,7 +11,7 @@ import algos.maTT.core as core
 
 import envs
 
-__author__ = 'Christopher D Hsu'
+__author__ = 'GaKuppa'
 __copyright__ = ''
 __credits__ = ['Christopher D Hsu']
 __license__ = ''
@@ -73,7 +73,7 @@ def parse_args():
         help="the number of mini-batches")
     parser.add_argument("--update_epochs", type=int, default=4,
         help="the K epochs to update the policy")
-    parser.add_argument("--norm_adv", type=lambda x: bool(strtobool(x)), default=True, nargs="?", const=True,
+    parser.add_argument("--norm_adv", type=lambda x: bool(strtobool(x)), default=False, nargs="?", const=True,
         help="Toggles advantages normalization")
     parser.add_argument("--clip_coef", type=float, default=0.2,
         help="the surrogate clipping coefficient")
