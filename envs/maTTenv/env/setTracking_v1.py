@@ -44,6 +44,7 @@ class setTrackingEnv1(maTrackingBase):
 
         self.id = 'setTracking-v1'
         self.metadata = self.id
+        self.scaled = kwargs["scaled"]
         self.nb_agents = num_agents #only for init, will change with reset()
         self.nb_targets = num_targets #only for init, will change with reset()
         self.agent_dim = 3
@@ -55,14 +56,19 @@ class setTrackingEnv1(maTrackingBase):
         self.limit['target'] = [np.concatenate((self.MAP.mapmin,[-METADATA['target_vel_limit'], -METADATA['target_vel_limit']])),
                                 np.concatenate((self.MAP.mapmax, [METADATA['target_vel_limit'], METADATA['target_vel_limit']]))]
         rel_vel_limit = METADATA['target_vel_limit'] + METADATA['action_v'][0] # Maximum relative speed
+        #self.limit['state'] = [np.array(([0.0, -np.pi, -rel_vel_limit, -10*np.pi, 0, 0, 0, 0, -50.0, 0.0])),
+        #                       np.array(([600.0, np.pi, rel_vel_limit, 10*np.pi, 1, 1, 1, 1, 50.0, 2.0]))]
+        
         self.limit['state'] = [np.array(([0.0, -np.pi, -rel_vel_limit, -10*np.pi, -50.0, 0.0])),
                                np.array(([600.0, np.pi, rel_vel_limit, 10*np.pi, 50.0, 2.0]))]
-        
+        # lower_limit = np.hstack((self.limit['state'][0], self.limit['target'][0], float("-inf") * np.ones(self.target_dim ** 2)))
+        # upper_limit = np.hstack((self.limit['state'][1], self.limit['target'][1], float("inf") * np.ones(self.target_dim ** 2)))
+        # observation_space = spaces.Box(np.tile(lower_limit, (self.num_targets, 1)), np.tile(upper_limit, (self.num_targets, 1)), dtype=np.float32)
         observation_space = spaces.Box(np.tile(self.limit['state'][0], (self.num_targets, 1)), np.tile(self.limit['state'][1], (self.num_targets, 1)), dtype=np.float32)
         self.observation_space = {f"agent-{i}":observation_space for i in range(self.nb_agents)}
         self.observation_space = spaces.Dict(self.observation_space)
         self.targetA = np.concatenate((np.concatenate((np.eye(2), self.sampling_period*np.eye(2)), axis=1), 
-                                        [[0,0,1,0],[0,0,0,1]]))
+                                       [[0,0,1,0],[0,0,0,1]]))
         self.target_noise_cov = METADATA['const_q'] * np.concatenate((
                         np.concatenate((self.sampling_period**3/3*np.eye(2), self.sampling_period**2/2*np.eye(2)), axis=1),
                         np.concatenate((self.sampling_period**2/2*np.eye(2), self.sampling_period*np.eye(2)),axis=1) ))
@@ -79,7 +85,7 @@ class setTrackingEnv1(maTrackingBase):
         self.setup_targets()
         self.setup_belief_targets()
         # Use custom reward
-        self.get_reward()
+        #self.get_reward()
 
     def setup_agents(self):
         self.agents = [AgentSE2(agent_id = 'agent-' + str(i), 
@@ -104,7 +110,7 @@ class setTrackingEnv1(maTrackingBase):
                         for i in range(self.num_targets)]
 
     def get_reward(self, observed=None, is_training=True):
-        return reward_fun(self.nb_targets, self.belief_targets, is_training)
+        return reward_fun(self.scaled, self.agents, self.nb_targets, self.belief_targets, is_training)
     
     def reset(self,**kwargs):
         """
@@ -132,7 +138,13 @@ class setTrackingEnv1(maTrackingBase):
                                             xy_base=self.agents[kk].state[:2], 
                                             theta_base=self.agents[kk].state[2])
                 logdetcov = np.log(LA.det(self.belief_targets[jj].cov))
+                #from IPython import embed; embed()
                 obs_dict[self.agents[kk].agent_id].append([r, alpha, 0.0, 0.0, logdetcov, 0.0])
+                #obs_dict[self.agents[kk].agent_id].append([self.agents[kk].state[0]/51, self.agents[kk].state[1]/51, self.belief_targets[jj].state[0]/51, self.belief_targets[jj].state[1]/51, logdetcov])
+                #for b_target in self.belief_targets:
+                #    obs_dict[self.agents[kk].agent_id][-1].extend(np.vstack((b_target.state, b_target.cov)).ravel().tolist())
+        
+        
         for agent_id in obs_dict:
             obs_dict[agent_id] = torch.Tensor(obs_dict[agent_id])
         return obs_dict
@@ -182,8 +194,11 @@ class setTrackingEnv1(maTrackingBase):
                                         self.belief_targets[jj].state[2:],
                                         self.agents[ii].state[:2], self.agents[ii].state[-1],
                                         action_vw[0], action_vw[1])
+                #obs_dict[agent_id].append([r_b, alpha_b, r_dot_b, alpha_dot_b, self.agents[ii].state[0]/51, self.agents[ii].state[1]/51, self.belief_targets[jj].state[0]/51, self.belief_targets[jj].state[1]/51,
+                #                        np.log(LA.det(self.belief_targets[jj].cov)), float(obs)])
                 obs_dict[agent_id].append([r_b, alpha_b, r_dot_b, alpha_dot_b,
                                         np.log(LA.det(self.belief_targets[jj].cov)), float(obs)])
+            # obs_dict[agent_id] = torch.from_numpy(np.hstack(obs_dict[agent_id])).view(1, -1)
             obs_dict[agent_id] = torch.Tensor(obs_dict[agent_id])
             # shuffle obs to promote permutation invariance
             self.rng.shuffle(obs_dict[agent_id])
@@ -192,10 +207,22 @@ class setTrackingEnv1(maTrackingBase):
         done_dict['__all__'], info_dict['mean_nlogdetcov'] = done, mean_nlogdetcov
         return obs_dict, reward, done, info_dict
 
-def reward_fun(nb_targets, belief_targets, is_training=True, c_mean=0.1):
+def reward_fun(scaled, agents, nb_targets, belief_targets, is_training=True, c_mean=0.1):    
+    # observed is (num_targets, )
+    #from IPython import embed; embed()
     detcov = [LA.det(b_target.cov) for b_target in belief_targets[:nb_targets]]
     r_detcov_mean = - np.mean(np.log(detcov))
     reward = c_mean * r_detcov_mean
+    # reward = np.sum(np.where(observed, reward, -1))
+    if scaled:
+        distance = [np.linalg.norm(agents[0].state[:2] - b_target.state[:2]) for b_target in belief_targets]
+        distance = np.array(distance) # distance.sort()
+        if distance.shape[0] > 1:
+            indices = np.argsort(distance)
+            fraction = distance[indices[1:]]/distance[indices[0]]
+        else:
+            fraction = 1/distance[0]
+        reward *= fraction
 
     mean_nlogdetcov = None
     if not(is_training):

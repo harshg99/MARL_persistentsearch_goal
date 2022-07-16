@@ -5,6 +5,7 @@ from matplotlib import pyplot as plt
 import numpy as np
 import os.path as osp
 import torch
+from torch.utils.tensorboard import SummaryWriter
 
 __author__ = 'Christopher D Hsu'
 __copyright__ = ''
@@ -15,8 +16,8 @@ __maintainer__ = 'Christopher D Hsu'
 __email__ = 'chsu8@seas.upenn.edu'
 __status__ = 'Dev'
 
-def load_pytorch_policy(fpath, fname, model, deterministic=True):
-    fname = osp.join("runs", fpath.split(os.sep)[-1] ,fname)
+def load_pytorch_policy(fpath, fname, model, seed):
+    fname = osp.join("runs", fpath.split(os.sep)[-1], f"seed_{seed}",fname)
     assert os.path.exists(fname)
     map_location = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
     model.load_state_dict(torch.load(fname, map_location))
@@ -45,6 +46,25 @@ class Test:
         pass
 
     def test(self, args, env, act, torch_threads=1):
+        run_name = args.log_dir.split(os.sep)[-1] + "_eval"
+        if args.track:
+            import wandb
+
+            wandb.init(
+                project=args.wandb_project_name,
+                entity=args.wandb_entity,
+                sync_tensorboard=True,
+                config=vars(args),
+                name=run_name,
+                monitor_gym=True,
+                save_code=True,
+            )
+        writer = SummaryWriter(f"runs/{run_name}")
+        writer.add_text(
+            "hyperparameters",
+            "|param|value|\n|-|-|\n%s" % ("\n".join([f"|{key}|{value}|" for key, value in vars(args).items()])),
+        )
+        
         device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
         torch.set_num_threads(torch_threads)
 
@@ -107,11 +127,9 @@ class Test:
                 time_elapsed.append(time.time() - s_time)
                 ep_nlogdetcov.append(nlogdetcov)
                 
-                if args.render:
-                    print(f"Ep.{ep} - Episode reward : {episode_rew}, Episode nLogDetCov : {nlogdetcov}")
-                if ep % 50 == 0:
-                    print(f"Ep.{ep} - Episode reward : {episode_rew}, Episode nLogDetCov : {nlogdetcov}")
-
+                print(f"Ep.{ep} - Episode reward : {episode_rew}, Episode nLogDetCov : {nlogdetcov}")
+                for env_i in range(args.num_envs):
+                    writer.add_scalar(f"charts/episodic_return_env_{env_i}_eval", episode_rew[env_i], ep)
             if args.record :
                 env.envs[0].moviewriter.finish()
             #if args.ros_log :
@@ -155,6 +173,7 @@ class Test:
         _ = f1.savefig(os.path.join(eval_dir,'all_%d_eval'%(args.nb_test_eps)+model_seed+'.png'))
         plt.close()        
         pickle.dump(total_nlogdetcov, open(os.path.join(eval_dir,'all_%d_eval'%(args.nb_test_eps))+model_seed+'%da%dt'%(args.nb_agents,args.nb_targets)+'.pkl', 'wb'))
+        writer.close()
 
 SET_EVAL_v0 = [
         {'nb_agents': 1, 'nb_targets': 1}]

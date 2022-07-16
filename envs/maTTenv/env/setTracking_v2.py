@@ -43,6 +43,7 @@ class setTrackingEnv2(maTrackingBase):
 
         self.id = 'setTracking-v2'
         self.metadata = self.id
+        self.scaled = kwargs["scaled"]
         self.nb_agents = num_agents #only for init, will change with reset()
         self.nb_targets = num_targets #only for init, will change with reset()
         self.agent_dim = 3
@@ -61,7 +62,7 @@ class setTrackingEnv2(maTrackingBase):
         self.observation_space = {f"agent-{i}":observation_space for i in range(self.nb_agents)}
         self.observation_space = spaces.Dict(self.observation_space)
         self.targetA = np.concatenate((np.concatenate((np.eye(2), self.sampling_period*np.eye(2)), axis=1), 
-                                        [[0,0,1,0],[0,0,0,1]]))
+                                       [[0,0,1,0],[0,0,0,1]]))
         self.target_noise_cov = METADATA['const_q'] * np.concatenate((
                         np.concatenate((self.sampling_period**3/3*np.eye(2), self.sampling_period**2/2*np.eye(2)), axis=1),
                         np.concatenate((self.sampling_period**2/2*np.eye(2), self.sampling_period*np.eye(2)),axis=1) ))
@@ -78,7 +79,7 @@ class setTrackingEnv2(maTrackingBase):
         self.setup_targets()
         self.setup_belief_targets()
         # Use custom reward
-        self.get_reward()
+        #self.get_reward()
 
     def setup_agents(self):
         self.agents = [AgentSE2(agent_id = 'agent-' + str(i), 
@@ -105,7 +106,7 @@ class setTrackingEnv2(maTrackingBase):
                         for i in range(self.num_agents)]
 
     def get_reward(self, observed=None, is_training=True):
-        return reward_fun(self.nb_targets, self.belief_targets, is_training)
+        return reward_fun(self.scaled, self.agents, self.nb_targets, self.belief_targets, is_training)
 
     def get_init_pose_random(self,
                             lin_dist_range_target=(METADATA['init_distance_min'], METADATA['init_distance_max']),
@@ -164,7 +165,6 @@ class setTrackingEnv2(maTrackingBase):
         for ii in range(self.nb_agents):
             self.agents[ii].reset(init_pose['agents'][ii])
             obs_dict[self.agents[ii].agent_id] = []
-        #from IPython import embed; embed()
         # Initialize targets and beliefs
         for i in range(self.nb_targets):
             # reset target
@@ -243,17 +243,40 @@ class setTrackingEnv2(maTrackingBase):
             self.rng.shuffle(obs_dict[agent_id])
         # Get all rewards after all agents and targets move (t -> t+1)
         reward, done, mean_nlogdetcov = self.get_reward(observed, self.is_training)
-        done_dict['__all__'], info_dict['mean_nlogdetcov'] = done, mean_nlogdetcov
-        return obs_dict, reward, done_dict, info_dict
+        done_dict['__all__'], info_dict['mean_nlogdetcov'], info_dict['reward_all'] = done, mean_nlogdetcov, reward
+        # monitor wrapper requires a single reward, so individual agent rewards are stored in info_dict
+        return obs_dict, np.sum(reward), done, info_dict
 
-def reward_fun(nb_targets, belief_targets, is_training=True, c_mean=0.1):
-    detcov = [[LA.det(b_target.cov) for b_target in belief_target] for belief_target in belief_targets]
-    detcov = np.ravel(detcov)
-    r_detcov_mean = - np.mean(np.log(detcov))
-    reward = c_mean * r_detcov_mean
+def reward_fun(scaled, agents, nb_targets, belief_targets, is_training=True, c_mean=0.1):
+    
+    # detcov = 
+    detcov = [[LA.det(belief.cov) for belief in agents_beliefs] for agents_beliefs in belief_targets]
+    """
+    [ [{'agent-0_target-0': 810029.250273439},
+    {'agent-0_target-1': 810029.250273439}],
+    [{'agent-1_target-0': 810029.250273439},
+    {'agent-1_target-1': 810029.250273439}] ]
+    """
+    #
 
+    reward = [c_mean * -np.mean(np.log(agent_detcov)) for agent_detcov in detcov]
+    
+    # reward = np.sum(np.where(observed, reward, -1))
+    if scaled:
+        for agent_index in range(len(reward)):
+            distance = [np.linalg.norm(agents[agent_index].state[:2] - b_target.state[:2]) for b_target in belief_targets[agent_index]]
+            distance = np.array(distance) # distance.sort()
+            if distance.shape[0] > 1:
+                indices = np.argsort(distance)
+                fraction = np.sum(distance[indices[1:]])/distance[indices[0]]
+            else:
+                fraction = 1/distance[0]
+            reward[agent_index] *= fraction
+    #
     mean_nlogdetcov = None
     if not(is_training):
         logdetcov = [np.log(LA.det(b_target.cov)) for b_target in belief_targets[:nb_targets]]
         mean_nlogdetcov = -np.mean(logdetcov)
-    return reward, False, mean_nlogdetcov
+        # assert r_detcov_mean == mean_nlogdetcov
+    return np.array(reward), False, mean_nlogdetcov
+    
