@@ -1,4 +1,3 @@
-from email.message import EmailMessage
 import os, copy, pdb
 import numpy as np
 from numpy import linalg as LA
@@ -35,14 +34,14 @@ setTrackingEnv0 : Double Integrator Target model with KF belief tracker
 
 """
 
-class setTrackingEnv1(maTrackingBase):
+class setTrackingEnv2(maTrackingBase):
 
     def __init__(self, num_agents=1, num_targets=2, map_name='empty', 
                         is_training=True, known_noise=True, **kwargs):
         super().__init__(num_agents=num_agents, num_targets=num_targets,
                         map_name=map_name, is_training=is_training)
 
-        self.id = 'setTracking-v1'
+        self.id = 'setTracking-v2'
         self.metadata = self.id
         self.nb_agents = num_agents #only for init, will change with reset()
         self.nb_targets = num_targets #only for init, will change with reset()
@@ -97,14 +96,60 @@ class setTrackingEnv1(maTrackingBase):
                         for i in range(self.num_targets)]
 
     def setup_belief_targets(self):
-        self.belief_targets = [KFbelief(agent_id = 'target-' + str(i),
+        # self.global_belief_targets = # M target number of beliefs
+        self.belief_targets = [[KFbelief(agent_id = f"agent-{i}_target-{j}",
                         dim=self.target_dim, limit=self.limit['target'], A=self.targetA,
                         W=self.target_noise_cov, obs_noise_func=self.observation_noise, 
                         collision_func=lambda x: map_utils.is_collision(self.MAP, x))
-                        for i in range(self.num_targets)]
+                        for j in range(self.num_targets)]
+                        for i in range(self.num_agents)]
 
     def get_reward(self, observed=None, is_training=True):
         return reward_fun(self.nb_targets, self.belief_targets, is_training)
+
+    def get_init_pose_random(self,
+                            lin_dist_range_target=(METADATA['init_distance_min'], METADATA['init_distance_max']),
+                            ang_dist_range_target=(-np.pi, np.pi),
+                            lin_dist_range_belief=(METADATA['init_belief_distance_min'], METADATA['init_belief_distance_max']),
+                            ang_dist_range_belief=(-np.pi, np.pi),
+                            blocked=False,
+                            **kwargs):
+        is_agent_valid = False
+        init_pose = {}
+        init_pose['agents'] = []
+        init_pose['belief_targets'] = [[] for _ in range(self.nb_agents)]
+        for ii in range(self.nb_agents):
+            is_agent_valid = False
+            if self.MAP.map is None and ii==0:
+                if blocked:
+                    raise ValueError('Unable to find a blocked initial condition. There is no obstacle in this map.')
+                a_init = self.agent_init_pos[:2]
+            else:
+                while(not is_agent_valid):
+                    a_init = np.random.random((2,)) * (self.MAP.mapmax-self.MAP.mapmin) + self.MAP.mapmin
+                    is_agent_valid = not(map_utils.is_collision(self.MAP, a_init))
+            init_pose_agent = [a_init[0], a_init[1], np.random.random() * 2 * np.pi - np.pi]
+            init_pose['agents'].append(init_pose_agent)
+
+        init_pose['targets'] = []
+        for jj in range(self.nb_targets):
+            is_target_valid = False
+            while(not is_target_valid):
+                rand_agent = np.random.randint(self.nb_agents)
+                is_target_valid, init_pose_target = self.gen_rand_pose(
+                    init_pose['agents'][rand_agent][:2], init_pose['agents'][rand_agent][2],
+                    lin_dist_range_target[0], lin_dist_range_target[1],
+                    ang_dist_range_target[0], ang_dist_range_target[1])
+            init_pose['targets'].append(init_pose_target)
+            for kk in range(self.nb_agents):
+                is_belief_valid, init_pose_belief = False, np.zeros((2,))
+                while((not is_belief_valid) and is_target_valid):
+                    is_belief_valid, init_pose_belief = self.gen_rand_pose(
+                        init_pose['targets'][jj][:2], init_pose['targets'][jj][2],
+                        lin_dist_range_belief[0], lin_dist_range_belief[1],
+                        ang_dist_range_belief[0], ang_dist_range_belief[1])
+                init_pose['belief_targets'][kk].append(init_pose_belief)
+        return init_pose
     
     def reset(self,**kwargs):
         """
@@ -119,19 +164,25 @@ class setTrackingEnv1(maTrackingBase):
         for ii in range(self.nb_agents):
             self.agents[ii].reset(init_pose['agents'][ii])
             obs_dict[self.agents[ii].agent_id] = []
+        #from IPython import embed; embed()
         # Initialize targets and beliefs
-        for nn in range(self.nb_targets):
-            self.belief_targets[nn].reset(
-                        init_state=np.concatenate((init_pose['belief_targets'][nn][:2], np.zeros(2))),
-                        init_cov=self.target_init_cov)
-            self.targets[nn].reset(np.concatenate((init_pose['targets'][nn][:2], self.target_init_vel)))
+        for i in range(self.nb_targets):
+            # reset target
+            self.targets[i].reset(np.concatenate((init_pose['targets'][i][:2], self.target_init_vel)))
+            for j in range(self.nb_agents):
+                # reset belief target
+                self.belief_targets[j][i].reset(
+                            init_state=np.concatenate((init_pose['belief_targets'][j][i][:2], np.zeros(2))),
+                            init_cov=self.target_init_cov)
+                
+
         # For nb agents calculate belief of targets assigned
         for jj in range(self.nb_targets):
             for kk in range(self.nb_agents):
-                r, alpha = util.relative_distance_polar(self.belief_targets[jj].state[:2],
+                r, alpha = util.relative_distance_polar(self.belief_targets[kk][jj].state[:2],
                                             xy_base=self.agents[kk].state[:2], 
                                             theta_base=self.agents[kk].state[2])
-                logdetcov = np.log(LA.det(self.belief_targets[jj].cov))
+                logdetcov = np.log(LA.det(self.belief_targets[kk][jj].cov))
                 obs_dict[self.agents[kk].agent_id].append([r, alpha, 0.0, 0.0, logdetcov, 0.0])
         for agent_id in obs_dict:
             obs_dict[agent_id] = torch.Tensor(obs_dict[agent_id])
@@ -144,10 +195,14 @@ class setTrackingEnv1(maTrackingBase):
         info_dict = {}
 
         # Targets move (t -> t+1)
-        for n in range(self.nb_targets):
-            self.targets[n].update() 
-            self.belief_targets[n].predict() # Belief state at t+1
-         
+        for i in range(self.nb_targets):
+            # update target
+            self.targets[i].update() # self.targets[i].reset(np.concatenate((init_pose['targets'][i][:2], self.target_init_vel)))
+            for j in range(self.nb_agents):
+                self.belief_targets[j][i].predict() # Belief state at t+1
+        # Target and map observations
+        observed = np.zeros((self.nb_agents, self.nb_targets), dtype=bool)
+            
         # Agents move (t -> t+1) and observe the targets
         for ii, agent_id in enumerate(action_dict):
             obs_dict[self.agents[ii].agent_id] = []
@@ -163,37 +218,37 @@ class setTrackingEnv1(maTrackingBase):
                     margin_pos.append(np.array(self.agents[p].state[:2]))
             _ = self.agents[ii].update(action_vw, margin_pos)
             
-            # Target and map observations
-            observed = np.zeros(self.nb_targets, dtype=bool)
+            
 
             # Update beliefs of targets
             for jj in range(self.nb_targets):
                 # Observe
                 obs, z_t = self.observation(self.targets[jj], self.agents[ii])
-                observed[jj] = obs
+                observed[ii][jj] = obs
                 if obs: # if observed, update the target belief.
-                    self.belief_targets[jj].update(z_t, self.agents[ii].state)
+                    self.belief_targets[ii][jj].update(z_t, self.agents[ii].state)
 
-                r_b, alpha_b = util.relative_distance_polar(self.belief_targets[jj].state[:2],
+                r_b, alpha_b = util.relative_distance_polar(self.belief_targets[ii][jj].state[:2],
                                         xy_base=self.agents[ii].state[:2], 
                                         theta_base=self.agents[ii].state[-1])
                 r_dot_b, alpha_dot_b = util.relative_velocity_polar(
-                                        self.belief_targets[jj].state[:2],
-                                        self.belief_targets[jj].state[2:],
+                                        self.belief_targets[ii][jj].state[:2],
+                                        self.belief_targets[ii][jj].state[2:],
                                         self.agents[ii].state[:2], self.agents[ii].state[-1],
                                         action_vw[0], action_vw[1])
                 obs_dict[agent_id].append([r_b, alpha_b, r_dot_b, alpha_dot_b,
-                                        np.log(LA.det(self.belief_targets[jj].cov)), float(obs)])
+                                        np.log(LA.det(self.belief_targets[ii][jj].cov)), float(obs)])
             obs_dict[agent_id] = torch.Tensor(obs_dict[agent_id])
             # shuffle obs to promote permutation invariance
             self.rng.shuffle(obs_dict[agent_id])
         # Get all rewards after all agents and targets move (t -> t+1)
         reward, done, mean_nlogdetcov = self.get_reward(observed, self.is_training)
         done_dict['__all__'], info_dict['mean_nlogdetcov'] = done, mean_nlogdetcov
-        return obs_dict, reward, done, info_dict
+        return obs_dict, reward, done_dict, info_dict
 
 def reward_fun(nb_targets, belief_targets, is_training=True, c_mean=0.1):
-    detcov = [LA.det(b_target.cov) for b_target in belief_targets[:nb_targets]]
+    detcov = [[LA.det(b_target.cov) for b_target in belief_target] for belief_target in belief_targets]
+    detcov = np.ravel(detcov)
     r_detcov_mean = - np.mean(np.log(detcov))
     reward = c_mean * r_detcov_mean
 
@@ -201,5 +256,4 @@ def reward_fun(nb_targets, belief_targets, is_training=True, c_mean=0.1):
     if not(is_training):
         logdetcov = [np.log(LA.det(b_target.cov)) for b_target in belief_targets[:nb_targets]]
         mean_nlogdetcov = -np.mean(logdetcov)
-        # assert r_detcov_mean == mean_nlogdetcov
     return reward, False, mean_nlogdetcov

@@ -2,6 +2,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 from algos.maTT.modules import *
+from torch.distributions.categorical import Categorical
 
 __author__ = 'Christopher D Hsu'
 __copyright__ = ''
@@ -20,6 +21,10 @@ def combined_shape(length, shape=None):
 def count_vars(module):
     return sum([np.prod(p.shape) for p in module.parameters()])
 
+def layer_init(layer, std=np.sqrt(2), bias_const=0.0):
+    torch.nn.init.orthogonal_(layer.weight, std)
+    torch.nn.init.constant_(layer.bias, bias_const)
+    return layer
 
 class SoftActionSelector(nn.Module):
     '''
@@ -112,3 +117,45 @@ class DeepSetmodel(nn.Module):
             a, _ = self.pi(v1+v2, deterministic, False)
             # Tensor to int
             return int(a)
+
+class PPO(nn.Module):
+    def __init__(self, envs, args):
+        super().__init__()
+        self.envs = envs
+        self.args = args
+        key = list(envs.single_observation_space.keys())[0]
+        self.critic = nn.Sequential(
+            layer_init(nn.Linear(np.array(envs.single_observation_space[key].shape).prod(), 64)),
+            nn.Tanh(),
+            layer_init(nn.Linear(64, 64)),
+            nn.Tanh(),
+            layer_init(nn.Linear(64, 1), std=1.0),
+        )
+        self.actor = nn.Sequential(
+            layer_init(nn.Linear(np.array(envs.single_observation_space[key].shape).prod(), 64)),
+            nn.Tanh(),
+            layer_init(nn.Linear(64, 64)),
+            nn.Tanh(),
+            layer_init(nn.Linear(64, envs.single_action_space.n), std=0.01),
+        )
+        self.device = torch.device("cuda" if torch.cuda.is_available() and args.cuda else "cpu")
+
+    def get_value(self, x):
+        if isinstance(x, np.ndarray):
+            x = torch.from_numpy(x)
+        if not x.is_cuda:
+            x = x.to(self.device)
+        x = x.view(-1, x.shape[-2] * x.shape[-1])
+        return self.critic(x)
+
+    def get_action_and_value(self, x, action=None):
+        if isinstance(x, np.ndarray):
+            x = torch.from_numpy(x)
+        if not x.is_cuda:
+            x = x.to(self.device)
+        x = x.view(-1, x.shape[-2] * x.shape[-1])
+        logits = self.actor(x)
+        probs = Categorical(logits=logits)
+        if action is None:
+            action = probs.sample()
+        return action, probs.log_prob(action), probs.entropy(), self.critic(x)

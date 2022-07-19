@@ -1,6 +1,11 @@
 #repo specific ignores
 results/
-
+runs/
+wandb/
+algos/maTT/results/
+algos/maTT/runs/
+algos/maTT/wandb/
+eval_seed1_emptyMed
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
@@ -80,6 +85,7 @@ target/
 
 # Jupyter Notebook
 .ipynb_checkpoints
+*.ipynb
 
 # IPython
 profile_default/
@@ -109,7 +115,7 @@ celerybeat.pid
 .env
 .venv
 venv/
-ENV/
+# ENV/
 env.bak/
 venv.bak/
 
@@ -130,3 +136,6 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+
+#macOS
+*.DS_Store*
