@@ -38,8 +38,9 @@ class Agent(object):
         #List of belief over all targets
         self.Belief = Belief
 
-    def updateBelief(self,z_t):
-        self.Belief.update(z_t,self.state)
+    def updateBelief(self,targetID = None,z_t=None):
+        if targetID is not None and z_t is not None:
+            self.Belief[targetID].update(z_t,self.state)
 
     def updateCommBelief(self,comms_recv_beliefs):
         '''
@@ -82,6 +83,7 @@ class AgentSE2(Agent):
 
     def reset(self, init_state):
         super().reset(init_state)
+        self.vw = [0.0, 0.0]
         if self.policy:
             self.policy.reset(init_state)
 
@@ -98,6 +100,7 @@ class AgentSE2(Agent):
         if self.collision_check(new_state[:2]):
             is_col = 1
             new_state[:2] = self.state[:2]
+            control_input = self.vw
             if self.policy is not None:
                 # self.policy.collision(new_state)
                 corrected_policy = self.policy.collision(new_state)
@@ -108,8 +111,10 @@ class AgentSE2(Agent):
         elif margin_pos is not None:
             if self.margin_check(new_state[:2], margin_pos):
                 new_state[:2] = self.state[:2]
+                control_input = self.vw
        
         self.state = new_state
+        self.vw = control_input
         self.range_check()        
 
         return is_col

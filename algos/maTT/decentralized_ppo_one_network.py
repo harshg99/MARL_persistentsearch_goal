@@ -20,7 +20,7 @@ from distutils.util import strtobool
 from tqdm import tqdm
 
 import gym
-from stable_baselines.common.cmd_util import make_vec_env
+from stable_baselines3.common.env_util import make_vec_env
 import numpy as np
 import torch
 import torch.nn as nn
@@ -95,6 +95,7 @@ def decentralized_ppo(envs, model, args, run_name):
     logprobs = torch.zeros((args.num_steps, args.num_envs, args.nb_agents)).to(device)
 
     rewards = torch.zeros((args.num_steps, args.num_envs,args.nb_agents)).to(device)
+
     dones = torch.zeros((args.num_steps, args.num_envs)).to(device)
     values = torch.zeros((args.num_steps, args.num_envs, args.nb_agents)).to(device)
 
@@ -102,6 +103,7 @@ def decentralized_ppo(envs, model, args, run_name):
     global_step = 0
     start_time = time.time()
     next_obs = envs.reset()
+    
     next_done = torch.zeros(args.num_envs).to(device)
     num_updates = args.total_timesteps // args.batch_size
     ep_length = 0
@@ -131,11 +133,16 @@ def decentralized_ppo(envs, model, args, run_name):
             
             if args.render:
                 envs.envs[0].render()
-            # TRY NOT TO MODIFY: execute the game and log data.            
+            # TRY NOT TO MODIFY: execute the game and log data.
             next_obs, reward, done, info = envs.step(action_dict)
-            rewards[step] = torch.tensor(reward).to(device).view(-1)
+            if "reward_all" in info:
+                rewards[step] = torch.tensor(np.stack(info['reward_all'])).to(device)
+            else:
+                rewards[step] = torch.tensor(np.repeat(reward,  args.nb_agents, axis=0).reshape(args.num_envs, args.nb_agents)).to(device)
+            
             next_done = torch.Tensor(done).to(device)
             if torch.sum(next_done).item() == args.num_envs:
+                # from IPython import embed; embed()
                 for env_i in range(args.num_envs):
                     print(f"global_step={global_step}, episodic_return_env={env_i}={torch.sum(rewards[step - ep_length:step, env_i]).item()}")
                     writer.add_scalar(f"charts/episodic_return_env_{env_i}", torch.sum(rewards[step - ep_length:step, env_i]).item(), global_step)
@@ -162,7 +169,7 @@ def decentralized_ppo(envs, model, args, run_name):
                             nextnonterminal = 1.0 - dones[t + 1]
                             nextvalues = values[t + 1, :, i]
                         #from IPython import embed; embed()
-                        delta = rewards[t] + args.gamma * nextvalues * nextnonterminal - values[t, :, i]
+                        delta = rewards[t, :, i] + args.gamma * nextvalues * nextnonterminal - values[t, :, i]
                         advantages[t, :, i] = lastgaelam = delta + args.gamma * args.gae_lambda * nextnonterminal * lastgaelam
                     returns[:, :, i] = advantages[:, :, i] + values[:, :, i]
                 else:
@@ -173,7 +180,7 @@ def decentralized_ppo(envs, model, args, run_name):
                         else:
                             nextnonterminal = 1.0 - dones[t + 1]
                             next_return = returns[t + 1, :, i]
-                        returns[t, :, i] = rewards[t] + args.gamma * nextnonterminal * next_return
+                        returns[t, :, i] = rewards[t, :, i] + args.gamma * nextnonterminal * next_return
                     advantages[:, :, i] = returns[:, :, i] - values[:, :, i]
             
             # flatten the batch
@@ -241,7 +248,9 @@ def decentralized_ppo(envs, model, args, run_name):
 
         # model saving  
         if update % save_freq == 0:
-            torch.save(agent_network.state_dict(), os.path.join("runs", run_name, f'model_{update}.pt'))
+            if not os.path.exists(os.path.join("runs", run_name, f'seed_{args.seed}')):
+                os.makedirs(os.path.join("runs", run_name, f'seed_{args.seed}'))
+            torch.save(agent_network.state_dict(), os.path.join("runs", run_name, f'seed_{args.seed}', f'model_{update}.pt'))
 
         y_pred, y_true = b_values.cpu().numpy(), b_returns.cpu().numpy()
         var_y = np.var(y_true)
@@ -258,8 +267,12 @@ def decentralized_ppo(envs, model, args, run_name):
         writer.add_scalar("losses/explained_variance", explained_var, global_step)
         print("SPS:", int(global_step / (time.time() - start_time)))
         writer.add_scalar("charts/SPS", int(global_step / (time.time() - start_time)), global_step)
+    
+    
+
     if args.record:
         print('finished')
         envs.envs[0].moviewriter.finish()
     envs.close()
     writer.close()
+    return agent_network

@@ -1,6 +1,6 @@
 from envs.utilities.ma_time_limit import maTimeLimit, maTimeLimitVec
 import gym
-from stable_baselines.common.cmd_util import make_vec_env
+from stable_baselines3.common.env_util import make_vec_env
 
 def make(env_name, render=False, figID=0, record=False, directory='',
                     T_steps=None, num_agents=2, num_targets=1, **kwargs):
@@ -46,7 +46,7 @@ def make(env_name, render=False, figID=0, record=False, directory='',
         env = Video2D(env, dirname = directory)
     
     
-    if "num_envs" in kwargs and kwargs["num_envs"] > 1:
+    if "num_envs" in kwargs and kwargs["num_envs"] > 0:
         env = make_vec_env(lambda: env, n_envs=kwargs["num_envs"], vec_env_cls=gym.vector.SyncVectorEnv)
         env = maTimeLimitVec(env, max_episode_steps=T_steps)
     else:
