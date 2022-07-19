@@ -110,7 +110,7 @@ class setTrackingEnv2(maTrackingBase):
             agents.setupIndividualBelief(deepcopy(self.global_belief_targets))
 
     def get_reward(self, observed=None, is_training=True):
-        return reward_fun(self.nb_targets, self.belief_targets, is_training)
+        return self.reward_fun(self.nb_targets, self.belief_targets, is_training)
 
     def get_init_pose_random(self,
                             lin_dist_range_target=(METADATA['init_distance_min'], METADATA['init_distance_max']),
@@ -287,13 +287,37 @@ class setTrackingEnv2(maTrackingBase):
 
 
         # Get all rewards after all agents and targets move (t -> t+1)
-        reward, done, mean_nlogdetcov = self.get_reward(observed, self.is_training)
+        reward, reward_dict,done, mean_nlogdetcov = self.get_reward(observed, self.is_training)
         done_dict['__all__'], info_dict['mean_nlogdetcov'] = done, mean_nlogdetcov
+        info_dict['individual_rewards'] = reward_dict
+
         return obs_dict, reward, done_dict, info_dict
+
+    def reward_fun(self, nb_targets, belief_targets, is_training=True, c_mean=0.1):
+        #TODO: reward should be per agent
+        globaldetcov = [LA.det(b_target.cov) for b_target in belief_targets]
+
+        globaldetcov = np.ravel(globaldetcov)
+
+        r_detcov_sum = - np.sum(np.log(globaldetcov))
+        reward = c_mean * r_detcov_sum
+
+        reward_dict = {}
+        for id,agent in enumerate(self.agents):
+            detcov = [LA.det(b.cov) for b in agent.Belief]
+            detcov = np.ravel(detcov)
+            detcov_max = np.max(detcov)
+            reward_dict[id] = c_mean*detcov_max
+
+        mean_nlogdetcov = None
+        if not(is_training):
+            logdetcov = [np.log(LA.det(b_target.cov)) for b_target in belief_targets[:nb_targets]]
+            mean_nlogdetcov = -np.mean(logdetcov)
+        return reward,reward_dict, False, mean_nlogdetcov
 
 def reward_fun(nb_targets, belief_targets, is_training=True, c_mean=0.1):
     #TODO: reward should be per agent
-    detcov = [[LA.det(b_target.cov) for b_target in belief_target] for belief_target in belief_targets]
+    detcov = [LA.det(b_target.cov) for b_target in belief_targets]
     detcov = np.ravel(detcov)
     r_detcov_mean = - np.mean(np.log(detcov))
     reward = c_mean * r_detcov_mean

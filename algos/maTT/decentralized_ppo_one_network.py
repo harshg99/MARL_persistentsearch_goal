@@ -93,7 +93,8 @@ def decentralized_ppo(envs, model, args, run_name):
     obs = torch.zeros((args.num_steps, args.num_envs, args.nb_agents) + envs.single_observation_space["agent-0"].shape).to(device)
     actions = torch.zeros((args.num_steps, args.num_envs, args.nb_agents) + envs.single_action_space.shape).to(device)
     logprobs = torch.zeros((args.num_steps, args.num_envs, args.nb_agents)).to(device)
-    rewards = torch.zeros((args.num_steps, args.num_envs)).to(device)
+
+    rewards = torch.zeros((args.num_steps, args.num_envs,args.nb_agents)).to(device)
     dones = torch.zeros((args.num_steps, args.num_envs)).to(device)
     values = torch.zeros((args.num_steps, args.num_envs, args.nb_agents)).to(device)
 
