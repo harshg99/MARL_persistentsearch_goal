@@ -98,7 +98,6 @@ class setTrackingEnv2(maTrackingBase):
                         for i in range(self.num_targets)]
 
     def setup_belief_targets(self):
-        # self. = # M target number of beliefs
         self.belief_targets = [KFbelief(agent_id = 'target-' + str(i),
                         dim=self.target_dim, limit=self.limit['target'], A=self.targetA,
                         W=self.target_noise_cov, obs_noise_func=self.observation_noise,
@@ -204,17 +203,17 @@ class setTrackingEnv2(maTrackingBase):
     def communicate_graph(self):
         agent_comms_dict = {}
 
-        for id,agentID in enumerate(self.agents):
-            for id2,agentID2 in enumerate(self.agents):
-                r, alpha = util.relative_distance_polar(agentID2.state[:2],
-                                                        xy_base=agentID.state[:2],
-                                                        theta_base=agentID.state[2])
+        for i, agent_i in enumerate(self.agents):
+            for j, agent_j in enumerate(self.agents):
+                r, _ = util.relative_distance_polar(agent_j.state[:2],
+                                                        xy_base=agent_i.state[:2],
+                                                        theta_base=agent_i.state[2])
 
                 if (r <= self.communication_range):
-                    if id not in agent_comms_dict.keys():
-                        agent_comms_dict[id] = [id2]
+                    if agent_i.agent_id not in agent_comms_dict.keys():
+                        agent_comms_dict[i] = [j]
                     else:
-                        agent_comms_dict[id].append(id2)
+                        agent_comms_dict[i].append(j)
 
         return  agent_comms_dict
 
@@ -232,7 +231,10 @@ class setTrackingEnv2(maTrackingBase):
                 self.agents[j].belief[i].predict() # Belief state at t+1
         # Target and map observations
         observed = np.zeros((self.nb_agents, self.nb_targets), dtype=bool)
-            
+
+        #Communication
+        agent_graph = self.communicate_graph()
+
         # Agents move (t -> t+1) and observe the targets
         for ii, agent_id in enumerate(action_dict):
             obs_dict[self.agents[ii].agent_id] = []
@@ -248,17 +250,10 @@ class setTrackingEnv2(maTrackingBase):
                     margin_pos.append(np.array(self.agents[p].state[:2]))
             _ = self.agents[ii].update(action_vw, margin_pos)
 
-            #Communication
-            agent_graph = self.communicate_graph()
+            # collect beliefs of agents within communication range
+            comm_recv_beliefs = [self.agents[i].belief for i in agent_graph[ii]]
+            self.agents[ii].updateCommBelief(comm_recv_beliefs)
 
-            update_comm_beliefs = []
-
-            for agentid in agent_graph.keys():
-                comm_recv_beliefs = [self.agents[ID].belief for ID in agent_graph[agentid]]
-                update_comm_beliefs.append(self.agents[agentid].updateCommBelief(comm_recv_beliefs))
-
-            for agentid,updatedCommBelief in enumerate(update_comm_beliefs):
-                self.agents[agentid].setBelief(updatedCommBelief)
 
 
             # Update beliefs of targets
