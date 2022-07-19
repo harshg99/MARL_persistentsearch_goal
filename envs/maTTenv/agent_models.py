@@ -34,7 +34,7 @@ class Agent(object):
         self.margin = margin
         self.belief = KFBelief
 
-    def setBelief(self,belief):
+    def setupBelief(self,belief):
         #List of belief over all targets
         self.belief = belief
 

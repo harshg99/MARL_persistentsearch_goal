@@ -190,7 +190,7 @@ class setTrackingEnv2(maTrackingBase):
                         init_state=np.concatenate((init_pose['belief_targets'][i][:2], np.zeros(2))),
                         init_cov=self.target_init_cov)
             for j,agent in enumerate(self.agents):
-                agent.Belief[i].reset(np.concatenate((init_pose['targets'][i][:2],np.zeros(2))), self.target_init_cov)
+                agent.belief[i].reset(np.concatenate((init_pose['targets'][i][:2],np.zeros(2))), self.target_init_cov)
                 
 
         # For nb agents calculate belief of targets assigned
@@ -203,19 +203,19 @@ class setTrackingEnv2(maTrackingBase):
     def observe_single(self,agentID,action_vw = None,isObserved = None):
         observation = []
         for jj in range(self.nb_targets):
-            r, alpha = util.relative_distance_polar(self.agents[agentID].Belief[jj].state[:2],
+            r, alpha = util.relative_distance_polar(self.agents[agentID].belief[jj].state[:2],
                                                     xy_base=self.agents[agentID].state[:2],
                                                     theta_base=self.agents[agentID].state[2])
             if action_vw is None:
                 r_dot_b,alpha_dot_b = 0.0,0.0
             else:
                 r_dot_b, alpha_dot_b = util.relative_velocity_polar(
-                    self.agents[agentID].Belief[jj].state[:2],
-                    self.agents[agentID].Belief[jj].state[:2],
+                    self.agents[agentID].belief[jj].state[:2],
+                    self.agents[agentID].belief[jj].state[:2],
                     self.agents[agentID].state[:2], self.agents[agentID].state[-1],
                     action_vw[0], action_vw[1])
 
-            logdetcov = np.log(LA.det(self.agents[agentID].Belief[jj].cov))
+            logdetcov = np.log(LA.det(self.agents[agentID].belief[jj].cov))
             if action_vw is None:
                 observed = 0.0
             else:
@@ -255,7 +255,7 @@ class setTrackingEnv2(maTrackingBase):
             self.targets[i].update() # self.targets[i].reset(np.concatenate((init_pose['targets'][i][:2], self.target_init_vel)))
             for j in range(self.nb_agents):
 
-                self.agents[j].Belief[i].predict()
+                self.agents[j].belief[i].predict()
 
             self.belief_targets[i].predict() # Belief state at t+1
         # Target and map observations
@@ -267,7 +267,7 @@ class setTrackingEnv2(maTrackingBase):
         update_comm_beliefs = []
 
         for id in agent_graph.keys():
-            comm_recv_beliefs = [self.agents[ID].Belief for ID in agent_graph[id]]
+            comm_recv_beliefs = [self.agents[ID].belief for ID in agent_graph[id]]
             update_comm_beliefs.append(self.agents[id].updateCommBelief(comm_recv_beliefs))
 
         for agentid, updatedCommBelief in enumerate(update_comm_beliefs):
@@ -301,6 +301,7 @@ class setTrackingEnv2(maTrackingBase):
 
                     # Update global belief
                     # TODO: Gaurav says: how to update global belief_target
+                    #TODO: Global belief updates with all agent observations as usual
                     self.belief_targets[jj].update(z_t, self.agents[ii].state)
 
 
@@ -331,7 +332,7 @@ class setTrackingEnv2(maTrackingBase):
 
         reward_dict = []
         for id,agent in enumerate(self.agents):
-            detcov = [LA.det(b.cov) for b in agent.Belief]
+            detcov = [LA.det(b.cov) for b in agent.belief]
             detcov = np.ravel(detcov)
             detcov_max = - np.log(np.max(detcov))
             reward_dict.append(c_mean*detcov_max)
