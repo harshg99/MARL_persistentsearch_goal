@@ -257,7 +257,6 @@ def reward_fun(scaled, agents, nb_targets, belief_targets, is_training=True, c_m
     [{'agent-1_target-0': 810029.250273439},
     {'agent-1_target-1': 810029.250273439}] ]
     """
-    #
 
     reward = [c_mean * -np.mean(np.log(agent_detcov)) for agent_detcov in detcov]
     
@@ -275,8 +274,8 @@ def reward_fun(scaled, agents, nb_targets, belief_targets, is_training=True, c_m
     #
     mean_nlogdetcov = None
     if not(is_training):
-        logdetcov = [np.log(LA.det(b_target.cov)) for b_target in belief_targets[:nb_targets]]
-        mean_nlogdetcov = -np.mean(logdetcov)
+        logdetcov = [[np.log(LA.det(belief.cov)) for belief in agents_beliefs] for agents_beliefs in belief_targets]
+        mean_nlogdetcov = [-np.mean(_logdetcov) for _logdetcov in logdetcov]
         # assert r_detcov_mean == mean_nlogdetcov
-    return np.array(reward), False, mean_nlogdetcov
+    return np.array(reward), False, np.stack(mean_nlogdetcov)
     

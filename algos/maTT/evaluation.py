@@ -118,7 +118,7 @@ class Test:
                     for agent_id, o in obs.items():
                         for env_i in range(o.shape[0]):
                             action_dict[env_i][agent_id] = act(o[env_i]).item() # , deterministic=False)
-                    # import pdb; pdb.set_trace()
+                    #import pdb; pdb.set_trace()
                     obs, rew, done, info = env.step(action_dict)
                     episode_rew += rew
                     nlogdetcov += info['mean_nlogdetcov']
