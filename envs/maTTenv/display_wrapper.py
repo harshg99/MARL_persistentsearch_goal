@@ -83,6 +83,10 @@ class Display2D(Wrapper):
                     [agent_pos[ii][1], agent_pos[ii][1]+METADATA['sensor_r']*np.sin(agent_pos[ii][2]+0.5*METADATA['fov']/180.0*np.pi)],'k', linewidth=0.5)
                 ax.plot([agent_pos[ii][0], agent_pos[ii][0]+METADATA['sensor_r']*np.cos(agent_pos[ii][2]-0.5*METADATA['fov']/180.0*np.pi)],
                     [agent_pos[ii][1], agent_pos[ii][1]+METADATA['sensor_r']*np.sin(agent_pos[ii][2]-0.5*METADATA['fov']/180.0*np.pi)],'k', linewidth=0.5)
+                # agents communication range
+                comm_arc = patches.Arc((agent_pos[ii][0], agent_pos[ii][1]), METADATA['comms_r']*2, METADATA['comms_r']*2, 
+                    angle = agent_pos[ii][2]/np.pi*180, theta1 = -180, theta2 = 180, edgecolor='orange', facecolor='orange')
+                ax.add_patch(comm_arc)
                 self.traj[ii][0].append(agent_pos[ii][0])
                 self.traj[ii][1].append(agent_pos[ii][1])
 

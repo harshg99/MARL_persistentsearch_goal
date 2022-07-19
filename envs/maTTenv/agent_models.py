@@ -32,14 +32,14 @@ class Agent(object):
         self.limit = limit
         self.collision_func = collision_func
         self.margin = margin
-        self.Belief = KFBelief
+        self.belief = KFBelief
 
-    def setupBelief(self,Belief):
+    def setBelief(self,belief):
         #List of belief over all targets
-        self.Belief = Belief
+        self.belief = belief
 
     def updateBelief(self,z_t):
-        self.Belief.update(z_t,self.state)
+        self.belief.update(z_t,self.state)
 
     def updateCommBelief(self,comms_recv_beliefs):
         '''
@@ -48,7 +48,7 @@ class Agent(object):
         :return: intermediate update beliefs
         '''
 
-        intermedBelief = deepcopy(self.Belief)
+        intermedBelief = deepcopy(self.belief)
         if len(comms_recv_beliefs)==0:
             return intermedBelief
 
