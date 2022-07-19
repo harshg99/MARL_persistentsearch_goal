@@ -11,7 +11,7 @@ matplotlib.use('TkAgg')
 from matplotlib import pyplot as plt
 from matplotlib import patches
 from matplotlib import animation
-from maTTenv.metadata import *
+from envs.maTTenv.metadata import *
 
 class Display2D(Wrapper):
     def __init__(self, env, figID = 0, skip = 1, confidence=0.95):
@@ -55,16 +55,15 @@ class Display2D(Wrapper):
         num_targets = self.env_core.nb_targets
         if type(self.env_core.targets) == list:
             target_true_pos = [self.env_core.targets[i].state[:2] for i in range(num_targets)]
-            target_b_state = [[self.env_core.belief_targets[j][i].state for i in range(num_targets)] for j in range(num_agents)] # state[3:5]
-            target_cov = [[self.env_core.belief_targets[j][i].cov for i in range(num_targets)] for j in range(num_agents)]
+            target_b_state = [[self.env_core.agents[i].belief[j].state for j in range(num_targets)]for i in range(self.num_agents)] # state[3:5]
+            target_cov = [[self.env_core.agents[i].belief[j].cov for j in range(num_targets)]for i in range(self.num_agents)]
         else:
             target_true_pos = self.env_core.targets.state[:,:2]
             target_b_state = self.env_core.belief_targets.state[:,:2]  # state[3:5]
-            target_cov = self.env_core.belief_targets.cov 
+            target_cov = self.env_core.belief_targets.cov
 
         if self.n_frames%self.skip == 0:
             self.fig.clf()       
-            #fig, axes = plt.subplots(nrows=num_agents, ncols=1, sharex=True, sharey=True)
             for i in range(num_agents):
                 figure = plt.figure(i)
                 
@@ -89,6 +88,10 @@ class Display2D(Wrapper):
                         [agent_pos[ii][1], agent_pos[ii][1]+METADATA['sensor_r']*np.sin(agent_pos[ii][2]+0.5*METADATA['fov']/180.0*np.pi)],'k', linewidth=0.5)
                     new_plot.plot([agent_pos[ii][0], agent_pos[ii][0]+METADATA['sensor_r']*np.cos(agent_pos[ii][2]-0.5*METADATA['fov']/180.0*np.pi)],
                         [agent_pos[ii][1], agent_pos[ii][1]+METADATA['sensor_r']*np.sin(agent_pos[ii][2]-0.5*METADATA['fov']/180.0*np.pi)],'k', linewidth=0.5)
+                    # agents communication range
+                    comm_arc = patches.Arc((agent_pos[ii][0], agent_pos[ii][1]), METADATA['comms_r']*2, METADATA['comms_r']*2, 
+                        angle = agent_pos[ii][2]/np.pi*180, theta1 = -180, theta2 = 180, edgecolor='orange', facecolor='orange')
+                    new_plot.add_patch(comm_arc)
                     self.traj[ii][0].append(agent_pos[ii][0])
                     self.traj[ii][1].append(agent_pos[ii][1])
 

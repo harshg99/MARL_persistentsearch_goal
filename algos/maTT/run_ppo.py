@@ -12,7 +12,7 @@ from algos.maTT.decentralized_ppo_one_network import decentralized_ppo
 
 import envs
 
-__author__ = 'Christopher D Hsu'
+__author__ = 'GaKuppa'
 __copyright__ = ''
 __credits__ = ['Christopher D Hsu']
 __license__ = ''
@@ -72,7 +72,7 @@ def parse_args():
         help="the number of mini-batches")
     parser.add_argument("--update_epochs", type=int, default=4,
         help="the K epochs to update the policy")
-    parser.add_argument("--norm_adv", type=lambda x: bool(strtobool(x)), default=True, nargs="?", const=True,
+    parser.add_argument("--norm_adv", type=lambda x: bool(strtobool(x)), default=False, nargs="?", const=True,
         help="Toggles advantages normalization")
     parser.add_argument("--clip_coef", type=float, default=0.2,
         help="the surrogate clipping coefficient")
@@ -94,7 +94,7 @@ def parse_args():
     
     ## maTT
     
-    parser.add_argument('--env', help='environment ID', default='setTracking-v1')
+    parser.add_argument('--env', help='environment ID', default='setTracking-v2')
     parser.add_argument('--map', type=str, default="emptyMed")
     parser.add_argument('--nb_agents', type=int, default=4)
     parser.add_argument('--nb_targets', type=int, default=4)

@@ -4,7 +4,8 @@ import numpy as np
 METADATA_v1 = {   
         'version' : 1,
         'sensor_r': 10.0,
-        'fov' : 90,
+        'comms_r': 15.0,
+        'fov' : 360,
         'sensor_r_sd': 0.2, # sensor range noise.
         'sensor_b_sd': 0.01, # sensor bearing noise.
         'target_init_cov': 30.0, # initial target diagonal Covariance.
@@ -26,7 +27,8 @@ METADATA_v1 = {
 METADATA_v2 = {   
         'version' : 1,
         'sensor_r': 10.0,
-        'fov' : 90,
+        'comms_r': 15.0,
+        'fov' : 360,
         'sensor_r_sd': 0.2, # sensor range noise.
         'sensor_b_sd': 0.01, # sensor bearing noise.
         'target_init_cov': 30.0, # initial target diagonal Covariance.
@@ -48,7 +50,8 @@ METADATA_v2 = {
 METADATA_v3 = {   
         'version' : 1,
         'sensor_r': 10.0,
-        'fov' : 90,
+        'comms_r': 15.0,
+        'fov' : 360,
         'sensor_r_sd': 0.2, # sensor range noise.
         'sensor_b_sd': 0.01, # sensor bearing noise.
         'target_init_cov': 30.0, # initial target diagonal Covariance.
@@ -70,7 +73,8 @@ METADATA_v3 = {
 METADATA_v4 = {
         'version' : 1,
         'sensor_r': 10.0,
-        'fov' : 90,
+        'comms_r': 15.0,
+        'fov' : 360,
         'sensor_r_sd': 0.2, # sensor range noise.
         'sensor_b_sd': 0.01, # sensor bearing noise.
         'target_init_cov': 30.0, # initial target diagonal Covariance.
@@ -94,4 +98,4 @@ METADATAS = {
     "4":METADATA_v4
 }
 ##Beliefs are initialized near target
-METADATA=METADATAS["1"]
+METADATA=METADATAS["2"]

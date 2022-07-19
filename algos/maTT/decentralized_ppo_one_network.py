@@ -20,7 +20,7 @@ from distutils.util import strtobool
 from tqdm import tqdm
 
 import gym
-from stable_baselines.common.cmd_util import make_vec_env
+from stable_baselines3.common.env_util import make_vec_env
 import numpy as np
 import torch
 import torch.nn as nn
@@ -93,7 +93,9 @@ def decentralized_ppo(envs, model, args, run_name):
     obs = torch.zeros((args.num_steps, args.num_envs, args.nb_agents) + envs.single_observation_space["agent-0"].shape).to(device)
     actions = torch.zeros((args.num_steps, args.num_envs, args.nb_agents) + envs.single_action_space.shape).to(device)
     logprobs = torch.zeros((args.num_steps, args.num_envs, args.nb_agents)).to(device)
-    rewards = torch.zeros((args.num_steps, args.num_envs, args.nb_agents)).to(device)
+
+    rewards = torch.zeros((args.num_steps, args.num_envs,args.nb_agents)).to(device)
+
     dones = torch.zeros((args.num_steps, args.num_envs)).to(device)
     values = torch.zeros((args.num_steps, args.num_envs, args.nb_agents)).to(device)
 
