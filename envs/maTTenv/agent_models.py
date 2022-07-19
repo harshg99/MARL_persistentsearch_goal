@@ -21,15 +21,52 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from torch.distributions.categorical import Categorical
+from copy import deepcopy
+from numpy import linalg as LA
 
 class Agent(object):
-    def __init__(self, agent_id, dim, sampling_period, limit, collision_func, margin=METADATA['margin']):
+    def __init__(self, agent_id, dim, sampling_period, limit, collision_func, margin=METADATA['margin'],KFBelief = None):
         self.agent_id = agent_id
         self.dim = dim
         self.sampling_period = sampling_period
         self.limit = limit
         self.collision_func = collision_func
         self.margin = margin
+        self.belief = KFBelief
+
+    def setupBelief(self,belief):
+        #List of belief over all targets
+        self.belief = belief
+
+
+    def updateBelief(self,targetID = None,z_t=None):
+        if targetID is not None and z_t is not None:
+            self.Belief[targetID].update(z_t,self.state)
+
+
+    def updateCommBelief(self,comms_recv_beliefs):
+        '''
+
+        :param comms_recv_beliefs: List of KF/UKF belifs from communicated agents
+        :return: intermediate update beliefs
+        '''
+
+        intermediateBelief = deepcopy(self.belief)
+        if len(comms_recv_beliefs)==0:
+            return
+
+        # for each belief target
+        for target_id in range(len(intermediateBelief)):
+            # for each neighbor, use min cov
+            for neigh in range(len(comms_recv_beliefs)):
+                logdetCov = LA.det(intermediateBelief[target_id].cov)
+                commslogdetCov = LA.det(comms_recv_beliefs[neigh][target_id].cov)
+                if commslogdetCov<logdetCov:
+                    # update list
+                    intermediateBelief[target_id].state = comms_recv_beliefs[neigh][target_id].state
+                    intermediateBelief[target_id].cov = comms_recv_beliefs[neigh][target_id].cov
+        print("updated comm belief")
+        self.belief = intermediateBelief
 
     def range_check(self):
         self.state = np.clip(self.state, self.limit[0], self.limit[1])
@@ -38,7 +75,7 @@ class Agent(object):
         return self.collision_func(pos[:2])
 
     def margin_check(self, pos, target_pos):
-        return any(np.sqrt(np.sum((pos - target_pos)**2, axis=1)) < self.margin) # no update 
+        return any(np.sqrt(np.sum((pos - target_pos)**2, axis=1)) < self.margin) # no update
 
     def reset(self, init_state):
         self.state = init_state
@@ -51,6 +88,7 @@ class AgentSE2(Agent):
 
     def reset(self, init_state):
         super().reset(init_state)
+        self.vw = [0.0, 0.0]
         if self.policy:
             self.policy.reset(init_state)
 
@@ -67,6 +105,7 @@ class AgentSE2(Agent):
         if self.collision_check(new_state[:2]):
             is_col = 1
             new_state[:2] = self.state[:2]
+            control_input = self.vw
             if self.policy is not None:
                 # self.policy.collision(new_state)
                 corrected_policy = self.policy.collision(new_state)
@@ -77,8 +116,10 @@ class AgentSE2(Agent):
         elif margin_pos is not None:
             if self.margin_check(new_state[:2], margin_pos):
                 new_state[:2] = self.state[:2]
+                control_input = self.vw
        
         self.state = new_state
+        self.vw = control_input
         self.range_check()        
 
         return is_col

@@ -28,3 +28,4 @@ mpi4py
 tensorboard
 seaborn
 pillow
+stable-basleines3 = 1.1.0

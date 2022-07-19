@@ -8,10 +8,10 @@ from envs.maTTenv.maps import map_utils
 import envs.maTTenv.util as util 
 from envs.maTTenv.metadata import METADATA
 
-
 class maTrackingBase(gym.Env):
     def __init__(self, num_agents=2, num_targets=1, map_name='empty',
                         is_training=True, known_noise=True, **kwargs):
+        
         self.seed()   #used with gym
         self.id = 'maTracking-base'
         self.action_space = spaces.Discrete(len(METADATA['action_v']) * \
@@ -149,8 +149,8 @@ class maTrackingBase(gym.Env):
 
     def get_init_pose_random(self,
                             lin_dist_range_target=(METADATA['init_distance_min'], METADATA['init_distance_max']),
-                            ang_dist_range_target=(-np.pi, np.pi),
                             lin_dist_range_belief=(METADATA['init_belief_distance_min'], METADATA['init_belief_distance_max']),
+                            ang_dist_range_target=(-np.pi, np.pi),
                             ang_dist_range_belief=(-np.pi, np.pi),
                             blocked=False,
                             **kwargs):

@@ -8,10 +8,11 @@ from gym import wrappers
 
 from algos.maTT.dql import doubleQlearning
 import algos.maTT.core as core
+from algos.maTT.decentralized_ppo_one_network import decentralized_ppo
 
 import envs
 
-__author__ = 'Christopher D Hsu'
+__author__ = 'GaKuppa'
 __copyright__ = ''
 __credits__ = ['Christopher D Hsu']
 __license__ = ''
@@ -26,8 +27,6 @@ os.environ['OMP_NUM_THREADS'] = '1'
 os.environ['MKL_NUM_THREADS'] = '1'
 
 BASE_DIR = os.path.dirname('/'.join(str.split(os.path.realpath(__file__),'/')[:-2]))
-
-
 
 ## cleanRL
 def parse_args():
@@ -73,7 +72,7 @@ def parse_args():
         help="the number of mini-batches")
     parser.add_argument("--update_epochs", type=int, default=4,
         help="the K epochs to update the policy")
-    parser.add_argument("--norm_adv", type=lambda x: bool(strtobool(x)), default=True, nargs="?", const=True,
+    parser.add_argument("--norm_adv", type=lambda x: bool(strtobool(x)), default=False, nargs="?", const=True,
         help="Toggles advantages normalization")
     parser.add_argument("--clip_coef", type=float, default=0.2,
         help="the surrogate clipping coefficient")
@@ -87,12 +86,15 @@ def parse_args():
         help="the maximum norm for the gradient clipping")
     parser.add_argument("--target_kl", type=float, default=None,
         help="the target KL divergence threshold")
-    parser.add_argument('--one_network', action='store_true')
-    parser.set_defaults(one_network=False)
+    parser.add_argument('--scaled', action='store_true')
+    parser.set_defaults(scaled=False)
+    parser.add_argument('--continue_training', action='store_true')
+    parser.set_defaults(continue_training=False)
+    
     
     ## maTT
     
-    parser.add_argument('--env', help='environment ID', default='setTracking-v1')
+    parser.add_argument('--env', help='environment ID', default='setTracking-v2')
     parser.add_argument('--map', type=str, default="emptyMed")
     parser.add_argument('--nb_agents', type=int, default=4)
     parser.add_argument('--nb_targets', type=int, default=4)
@@ -123,7 +125,6 @@ def parse_args():
     parser.add_argument('--repeat', type=int, default=1)
     parser.add_argument('--eval_type', choices=['random', 'fixed_4', 
                                                 'fixed_2', 'fixed_nb'], default='fixed_nb')
-
     parser.add_argument('--torch_threads', type=int, default=1)
     parser.add_argument('--amp', type=int, default=0)
     args = parser.parse_args()
@@ -136,28 +137,35 @@ def parse_args():
 
 def train(save_dir, args):
     run_name = save_dir.split(os.sep)[-1]
-    assert os.path.exists(save_dir)
+    save_dir_0 = os.path.join(save_dir, f"seed_{args.seed}")
+    if not os.path.exists(save_dir_0):
+        os.makedirs(save_dir_0)
+    else:
+        ValueError("The directory already exists...", save_dir_0)
+    assert os.path.exists(save_dir_0)
+
     env = envs.make(args.env,
                     'ma_target_tracking',
                     render=bool(args.render),
                     record=bool(args.record),
-                    directory=save_dir,
+                    directory=save_dir_0,
                     map_name=args.map,
                     num_agents=args.nb_agents,
                     num_targets=args.nb_targets,
                     is_training=True,
-                    num_envs=args.num_envs
+                    num_envs=args.num_envs,
+                    scaled=args.scaled,
                     )
-
     # Create env function
     # env_fn = lambda : env
     model = core.PPO(env, args)
-    if args.one_network:
-        from algos.maTT.decentralized_ppo_one_network import decentralized_ppo
-        decentralized_ppo(env, model, args, run_name)
-    else:
-        from algos.maTT.decentralized_ppo import decentralized_ppo
-        decentralized_ppo(env, model, args, run_name)
+    if args.continue_training:
+        fname = os.path.join("runs", run_name, f"seed_{args.seed}", args.log_fname)
+        map_location = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
+        model.load_state_dict(torch.load(fname, map_location))
+    trained_model = decentralized_ppo(env, model, args, run_name)
+    # final model saving  
+    torch.save(trained_model.state_dict(), os.path.join("runs", run_name, f'seed_{args.seed}', f'last_model.pt'))
 
 def test(args):
     from algos.maTT.evaluation import Test, load_pytorch_policy
@@ -171,12 +179,13 @@ def test(args):
                     num_agents=args.nb_agents,
                     num_targets=args.nb_targets,
                     is_training=False,
-                    num_envs=args.num_envs
+                    num_envs=args.num_envs,
+                    scaled=args.scaled
                     )
 
     # Load saved policy
-    model = core.PPO(env)
-    policy = load_pytorch_policy(args.log_dir, args.log_fname, model)
+    model = core.PPO(env, args)
+    policy = load_pytorch_policy(args.log_dir, args.log_fname, model, args.seed)
 
     # Testing environment
     Eval = Test()
@@ -211,7 +220,7 @@ if __name__ == '__main__':
     args = parse_args()
     if args.mode == 'train':
         date = datetime.datetime.now().strftime("%m%d%H%M")
-        run_name = f"{args.env}__{args.seed}__{date}"
+        run_name = f"{args.env}__{date}"
         save_dir = os.path.join(args.log_dir, run_name)
         if not os.path.exists(save_dir):
             os.makedirs(save_dir)
@@ -223,13 +232,10 @@ if __name__ == '__main__':
         f.write(notes)
         f.close()
 
-        seed = args.seed
-        list_records = []
         for _ in range(args.repeat):
-            print("===== TRAIN A TARGET TRACKING RL AGENT : SEED %d ====="%seed)
-            results = train(save_dir, args)
-            json.dump(vars(args), open(os.path.join(save_dir, 'learning_prop.json'), 'w'))
-            seed += 1
+            print(f"===== TRAIN A TARGET TRACKING RL AGENT : SEED {args.seed} =====")
+            model = train(save_dir, args)
+            json.dump(vars(args), open(os.path.join(save_dir, f"seed_{args.seed}", 'learning_prop.json'), 'w'))
             args.seed += 1
 
     elif args.mode =='test':
