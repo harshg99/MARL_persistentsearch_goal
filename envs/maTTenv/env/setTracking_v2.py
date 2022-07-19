@@ -99,7 +99,6 @@ class setTrackingEnv2(maTrackingBase):
                         for i in range(self.num_targets)]
 
     def setup_belief_targets(self):
-        # self.global_belief_targets = # M target number of beliefs
         self.belief_targets = [KFbelief(agent_id = 'target-' + str(i),
                         dim=self.target_dim, limit=self.limit['target'], A=self.targetA,
                         W=self.target_noise_cov, obs_noise_func=self.observation_noise,
@@ -109,6 +108,7 @@ class setTrackingEnv2(maTrackingBase):
 
         for index,agents in enumerate(self.agents):
             agents.setupBelief(deepcopy(self.belief_targets))
+
 
     def get_reward(self, observed=None, is_training=True):
         return self.reward_fun(self.nb_targets,self.belief_targets,is_training,c_mean=0.1,scaled = False)
@@ -185,6 +185,7 @@ class setTrackingEnv2(maTrackingBase):
             # reset target
             self.targets[i].reset(np.concatenate((init_pose['targets'][i][:2], self.target_init_vel)))
 
+
             self.belief_targets[i].reset(
                         init_state=np.concatenate((init_pose['belief_targets'][i][:2], np.zeros(2))),
                         init_cov=self.target_init_cov)
@@ -228,17 +229,17 @@ class setTrackingEnv2(maTrackingBase):
     def communicate_graph(self):
         agent_comms_dict = {}
 
-        for id,agentID in enumerate(self.agents):
-            for id2,agentID2 in enumerate(self.agents):
-                r, alpha = util.relative_distance_polar(agentID2.state[:2],
-                                                        xy_base=agentID.state[:2],
-                                                        theta_base=agentID.state[2])
+        for i, agent_i in enumerate(self.agents):
+            for j, agent_j in enumerate(self.agents):
+                r, _ = util.relative_distance_polar(agent_j.state[:2],
+                                                        xy_base=agent_i.state[:2],
+                                                        theta_base=agent_i.state[2])
 
                 if (r <= self.communication_range):
-                    if id not in agent_comms_dict.keys():
-                        agent_comms_dict[id] = [id2]
+                    if agent_i.agent_id not in agent_comms_dict.keys():
+                        agent_comms_dict[i] = [j]
                     else:
-                        agent_comms_dict[id].append(id2)
+                        agent_comms_dict[i].append(j)
 
         return agent_comms_dict
 
@@ -253,6 +254,7 @@ class setTrackingEnv2(maTrackingBase):
             # update target
             self.targets[i].update() # self.targets[i].reset(np.concatenate((init_pose['targets'][i][:2], self.target_init_vel)))
             for j in range(self.nb_agents):
+
                 self.agents[j].Belief[i].predict()
 
             self.belief_targets[i].predict() # Belief state at t+1
@@ -286,6 +288,7 @@ class setTrackingEnv2(maTrackingBase):
                     margin_pos.append(np.array(self.agents[p].state[:2]))
             _ = self.agents[ii].update(action_vw, margin_pos)
 
+
             # Update beliefs of targets
             for jj in range(self.nb_targets):
                 # Observe
@@ -295,10 +298,14 @@ class setTrackingEnv2(maTrackingBase):
                     #Update agents indivuudla be,liefs based on observation
                     self.agents[ii].updateBelief(targetID=jj,z_t = z_t)
 
-                    #Update global belief
+
+                    # Update global belief
+                    # TODO: Gaurav says: how to update global belief_target
                     self.belief_targets[jj].update(z_t, self.agents[ii].state)
 
+
             obs_dict[self.agents[ii].agent_id] = self.observe_single(ii,action_vw=action_vw,isObserved = observed[ii])
+
             # shuffle obs to promote permutation invariance
             #self.rng.shuffle(obs_dict[agent_id])
 
@@ -307,6 +314,7 @@ class setTrackingEnv2(maTrackingBase):
         # Get all rewards after all agents and targets move (t -> t+1)
         reward, reward_dict,done, mean_nlogdetcov = self.get_reward(observed, self.is_training)
         done_dict['__all__'], info_dict['mean_nlogdetcov'] = done, mean_nlogdetcov
+
         info_dict['reward_all'] = reward_dict
 
         return obs_dict, reward, done_dict, info_dict
@@ -314,6 +322,7 @@ class setTrackingEnv2(maTrackingBase):
     def reward_fun(self, nb_targets, belief_targets, is_training=True, c_mean=0.1,scaled = False):
         #TODO: reward should be per agent
         globaldetcov = [LA.det(b_target.cov) for b_target in belief_targets]
+
 
         globaldetcov = np.ravel(globaldetcov)
 

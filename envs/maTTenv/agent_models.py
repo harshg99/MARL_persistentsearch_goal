@@ -32,15 +32,17 @@ class Agent(object):
         self.limit = limit
         self.collision_func = collision_func
         self.margin = margin
-        self.Belief = KFBelief
+        self.belief = KFBelief
 
-    def setupBelief(self,Belief):
+    def setBelief(self,belief):
         #List of belief over all targets
-        self.Belief = Belief
+        self.belief = belief
+
 
     def updateBelief(self,targetID = None,z_t=None):
         if targetID is not None and z_t is not None:
             self.Belief[targetID].update(z_t,self.state)
+
 
     def updateCommBelief(self,comms_recv_beliefs):
         '''
@@ -49,19 +51,22 @@ class Agent(object):
         :return: intermediate update beliefs
         '''
 
-        intermedBelief = deepcopy(self.Belief)
+        intermediateBelief = deepcopy(self.belief)
         if len(comms_recv_beliefs)==0:
-            return intermedBelief
+            return
 
-        for targetId,targetBelief in enumerate(intermedBelief):
+        # for each belief target
+        for target_id in range(len(intermediateBelief)):
+            # for each neighbor, use min cov
             for neigh in range(len(comms_recv_beliefs)):
-                logdetCov = LA.det(targetBelief.cov)
-                commslogdetCov = LA.det(comms_recv_beliefs[neigh][targetId].cov)
+                logdetCov = LA.det(intermediateBelief[target_id].cov)
+                commslogdetCov = LA.det(comms_recv_beliefs[neigh][target_id].cov)
                 if commslogdetCov<logdetCov:
-                    targetBelief.state = comms_recv_beliefs[neigh][targetId].state
-                    targetBelief.cov = comms_recv_beliefs[neigh][targetId].cov
-
-        return intermedBelief
+                    # update list
+                    intermediateBelief[target_id].state = comms_recv_beliefs[neigh][target_id].state
+                    intermediateBelief[target_id].cov = comms_recv_beliefs[neigh][target_id].cov
+        print("updated comm belief")
+        self.belief = intermediateBelief
 
     def range_check(self):
         self.state = np.clip(self.state, self.limit[0], self.limit[1])
