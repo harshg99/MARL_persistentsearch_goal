@@ -276,6 +276,7 @@ def reward_fun(scaled, agents, nb_targets, belief_targets, is_training=True, c_m
     if not(is_training):
         logdetcov = [[np.log(LA.det(belief.cov)) for belief in agents_beliefs] for agents_beliefs in belief_targets]
         mean_nlogdetcov = [-np.mean(_logdetcov) for _logdetcov in logdetcov]
+        mean_nlogdetcov = np.stack(mean_nlogdetcov)
         # assert r_detcov_mean == mean_nlogdetcov
-    return np.array(reward), False, np.stack(mean_nlogdetcov)
+    return np.array(reward), False, mean_nlogdetcov
     

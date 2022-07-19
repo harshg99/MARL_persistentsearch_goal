@@ -64,56 +64,58 @@ class Display2D(Wrapper):
 
         if self.n_frames%self.skip == 0:
             self.fig.clf()       
-            fig, axes = plt.subplots(nrows=num_agents, ncols=1, sharex=True, sharey=True)
-
-            im = None
-            if mode == 'empty':
-                for i in range(num_agents):
-                    im = axes[i].imshow(self.map, cmap='gray_r', origin='lower',
-                        extent=[self.mapmin[0], self.mapmax[0], self.mapmin[1], self.mapmax[1]])
-            for i in range(axes.shape[0]):
+            #fig, axes = plt.subplots(nrows=num_agents, ncols=1, sharex=True, sharey=True)
+            for i in range(num_agents):
+                figure = plt.figure(i)
+                
+                figure.clf()
+                new_plot = figure.add_subplot(111)
                 for ii in range(num_agents):
                     #agents positions
-                    axes[i].plot(agent_pos[ii][0], agent_pos[ii][1], marker=(3, 0, agent_pos[ii][2]/np.pi*180-90),
+                    if i == ii:
+                        new_plot.plot(agent_pos[ii][0], agent_pos[ii][1], marker=(3, 0, agent_pos[ii][2]/np.pi*180-90),
+                        markersize=10, linestyle='None', markerfacecolor='m', markeredgecolor='m')
+                    else:
+                        new_plot.plot(agent_pos[ii][0], agent_pos[ii][1], marker=(3, 0, agent_pos[ii][2]/np.pi*180-90),
                         markersize=10, linestyle='None', markerfacecolor='b', markeredgecolor='b')
-                    axes[i].plot(self.traj[ii][0], self.traj[ii][1], 'b.', markersize=2)
+                    new_plot.plot(self.traj[ii][0], self.traj[ii][1], 'b.', markersize=2)
                     #agents velocities on legends
-                    axes[i].text(self.mapmax[0]+1., self.mapmax[1]-5*ii, f"v-agent-{ii}:{self.env_core.agents[ii].vw[0]}")
+                    new_plot.text(self.mapmax[0]+1., self.mapmax[1]-5*ii, f"v-agent-{ii}:{self.env_core.agents[ii].vw[0]}")
                     #agents sensor indicators
                     sensor_arc = patches.Arc((agent_pos[ii][0], agent_pos[ii][1]), METADATA['sensor_r']*2, METADATA['sensor_r']*2, 
                         angle = agent_pos[ii][2]/np.pi*180, theta1 = -METADATA['fov']/2, theta2 = METADATA['fov']/2, facecolor='gray')
-                    axes[i].add_patch(sensor_arc)
-                    axes[i].plot([agent_pos[ii][0], agent_pos[ii][0]+METADATA['sensor_r']*np.cos(agent_pos[ii][2]+0.5*METADATA['fov']/180.0*np.pi)],
+                    new_plot.add_patch(sensor_arc)
+                    new_plot.plot([agent_pos[ii][0], agent_pos[ii][0]+METADATA['sensor_r']*np.cos(agent_pos[ii][2]+0.5*METADATA['fov']/180.0*np.pi)],
                         [agent_pos[ii][1], agent_pos[ii][1]+METADATA['sensor_r']*np.sin(agent_pos[ii][2]+0.5*METADATA['fov']/180.0*np.pi)],'k', linewidth=0.5)
-                    axes[i].plot([agent_pos[ii][0], agent_pos[ii][0]+METADATA['sensor_r']*np.cos(agent_pos[ii][2]-0.5*METADATA['fov']/180.0*np.pi)],
+                    new_plot.plot([agent_pos[ii][0], agent_pos[ii][0]+METADATA['sensor_r']*np.cos(agent_pos[ii][2]-0.5*METADATA['fov']/180.0*np.pi)],
                         [agent_pos[ii][1], agent_pos[ii][1]+METADATA['sensor_r']*np.sin(agent_pos[ii][2]-0.5*METADATA['fov']/180.0*np.pi)],'k', linewidth=0.5)
                     self.traj[ii][0].append(agent_pos[ii][0])
                     self.traj[ii][1].append(agent_pos[ii][1])
 
                 for jj in range(num_targets):
-                    axes[i].plot(self.traj_y[jj][0], self.traj_y[jj][1], 'r.', markersize=2)
-                    axes[i].plot(target_true_pos[jj][0], target_true_pos[jj][1], marker='o', markersize=5, 
+                    new_plot.plot(self.traj_y[jj][0], self.traj_y[jj][1], 'r.', markersize=2)
+                    new_plot.plot(target_true_pos[jj][0], target_true_pos[jj][1], marker='o', markersize=5, 
                         linestyle='None', markerfacecolor='r', markeredgecolor='r')
                     # target velocities
-                    axes[i].text(self.mapmax[0]+1., self.mapmax[1]-5*num_agents-5*jj, f"v-target-{jj}:{np.sqrt(np.sum(self.env_core.targets[jj].state[2:]**2)):.2f}") # 'v_target:%.2f'%))
+                    new_plot.text(self.mapmax[0]+1., self.mapmax[1]-5*num_agents-5*jj, f"v-target-{jj}:{np.sqrt(np.sum(self.env_core.targets[jj].state[2:]**2)):.2f}") # 'v_target:%.2f'%))
 
                     # Belief on target
-                    axes[i].plot(target_b_state[i][jj][0], target_b_state[i][jj][1], marker='o', markersize=10, 
+                    new_plot.plot(target_b_state[i][jj][0], target_b_state[i][jj][1], marker='o', markersize=10, 
                         linewidth=5, markerfacecolor='none', markeredgecolor='g')
                     eig_val, eig_vec = LA.eig(target_cov[i][jj][:2,:2])
                     belief_target = patches.Ellipse((target_b_state[i][jj][0], target_b_state[i][jj][1]), 
                                 2*np.sqrt(eig_val[0])*self.c_cf, 2*np.sqrt(eig_val[1])*self.c_cf, 
                                 angle = 180/np.pi*np.arctan2(eig_vec[0][1],eig_vec[0][0]) ,fill=True,
                                 zorder=2, facecolor='g', alpha=0.5)
-                    axes[i].add_patch(belief_target)
+                    new_plot.add_patch(belief_target)
                     self.traj_y[jj][0].append(target_true_pos[jj][0])
                     self.traj_y[jj][1].append(target_true_pos[jj][1])
                     
-                    axes[i].set_xlim((self.mapmin[0], self.mapmax[0]))
-                    axes[i].set_ylim((self.mapmin[1], self.mapmax[1]))
-                    axes[i].set_aspect('equal','box')
-                    axes[i].grid()
-                    axes[i].set_title(' '.join([f'Agent # {i} Belief', mode.upper(),': Trajectory',str(traj_num)]))
+                    new_plot.set_xlim((self.mapmin[0], self.mapmax[0]))
+                    new_plot.set_ylim((self.mapmin[1], self.mapmax[1]))
+                    new_plot.set_aspect('equal','box')
+                    new_plot.grid()
+                    new_plot.set_title(' '.join([f'Agent # {i} Belief', mode.upper(),': Trajectory',str(traj_num)]))
 
             if not record :
                 plt.draw()
