@@ -41,7 +41,7 @@ class Agent(object):
 
     def updateBelief(self,targetID = None,z_t=None):
         if targetID is not None and z_t is not None:
-            self.Belief[targetID].update(z_t,self.state)
+            self.belief[targetID].update(z_t,self.state)
 
 
     def updateCommBelief(self,comms_recv_beliefs):
@@ -53,7 +53,7 @@ class Agent(object):
 
         intermediateBelief = deepcopy(self.belief)
         if len(comms_recv_beliefs)==0:
-            return
+            return intermediateBelief
 
         # for each belief target
         for target_id in range(len(intermediateBelief)):
@@ -65,8 +65,7 @@ class Agent(object):
                     # update list
                     intermediateBelief[target_id].state = comms_recv_beliefs[neigh][target_id].state
                     intermediateBelief[target_id].cov = comms_recv_beliefs[neigh][target_id].cov
-        print("updated comm belief")
-        self.belief = intermediateBelief
+        return intermediateBelief
 
     def range_check(self):
         self.state = np.clip(self.state, self.limit[0], self.limit[1])
