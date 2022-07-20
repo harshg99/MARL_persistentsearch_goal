@@ -107,66 +107,12 @@ class setTrackingEnv2(maTrackingBase):
                         for i in range(self.num_targets)]
         # Initialise individual target beliefs for each agent
 
-        for index,agents in enumerate(self.agents):
-            agents.setupBelief(deepcopy(self.belief_targets))
+        for agent in self.agents:
+            agent.setupBelief(deepcopy(self.belief_targets))
 
 
     def get_reward(self, observed=None, is_training=True):
         return self.reward_fun(self.nb_targets,self.belief_targets,is_training,c_mean=0.1,scaled = False)
-
-    def get_init_pose_random(self,
-                            lin_dist_range_target=(METADATA['init_distance_min'], METADATA['init_distance_max']),
-                            ang_dist_range_target=(-np.pi, np.pi),
-                            lin_dist_range_belief=(METADATA['init_belief_distance_min'], METADATA['init_belief_distance_max']),
-                            ang_dist_range_belief=(-np.pi, np.pi),
-                            blocked=False,
-                            **kwargs):
-        is_agent_valid = False
-        init_pose = {}
-        init_pose['agents'] = []
-        init_pose['belief_targets'] = []
-        #init_pose['local_beleif+targets'] = [[] for _ in range(self.nb_agents)]
-        for ii in range(self.nb_agents):
-            is_agent_valid = False
-            if self.MAP.map is None and ii==0:
-                if blocked:
-                    raise ValueError('Unable to find a blocked initial condition. There is no obstacle in this map.')
-                a_init = self.agent_init_pos[:2]
-            else:
-                while(not is_agent_valid):
-                    a_init = np.random.random((2,)) * (self.MAP.mapmax-self.MAP.mapmin) + self.MAP.mapmin
-                    is_agent_valid = not(map_utils.is_collision(self.MAP, a_init))
-            init_pose_agent = [a_init[0], a_init[1], np.random.random() * 2 * np.pi - np.pi]
-            init_pose['agents'].append(init_pose_agent)
-
-        init_pose['targets'] = []
-        for jj in range(self.nb_targets):
-            is_target_valid = False
-            while(not is_target_valid):
-                rand_agent = np.random.randint(self.nb_agents)
-                is_target_valid, init_pose_target = self.gen_rand_pose(
-                    init_pose['agents'][rand_agent][:2], init_pose['agents'][rand_agent][2],
-                    lin_dist_range_target[0], lin_dist_range_target[1],
-                    ang_dist_range_target[0], ang_dist_range_target[1])
-            init_pose['targets'].append(init_pose_target)
-
-            is_belief_valid, init_pose_belief = False, np.zeros((2,))
-            while ((not is_belief_valid) and is_target_valid):
-                is_belief_valid, init_pose_belief = self.gen_rand_pose(
-                    init_pose['targets'][jj][:2], init_pose['targets'][jj][2],
-                    lin_dist_range_belief[0], lin_dist_range_belief[1],
-                    ang_dist_range_belief[0], ang_dist_range_belief[1])
-            init_pose['belief_targets'].append(init_pose_belief)
-
-            # for kk in range(self.nb_agents):
-            #     is_belief_valid, init_pose_belief = False, np.zeros((2,))
-            #     while((not is_belief_valid) and is_target_valid):
-            #         is_belief_valid, init_pose_belief = self.gen_rand_pose(
-            #             init_pose['targets'][jj][:2], init_pose['targets'][jj][2],
-            #             lin_dist_range_belief[0], lin_dist_range_belief[1],
-            #             ang_dist_range_belief[0], ang_dist_range_belief[1])
-            #     init_pose['belief_targets'][kk].append(init_pose_belief)
-        return init_pose
     
     def reset(self,**kwargs):
         """
@@ -212,7 +158,7 @@ class setTrackingEnv2(maTrackingBase):
             else:
                 r_dot_b, alpha_dot_b = util.relative_velocity_polar(
                     self.agents[agentID].belief[jj].state[:2],
-                    self.agents[agentID].belief[jj].state[:2],
+                    self.agents[agentID].belief[jj].state[2:],
                     self.agents[agentID].state[:2], self.agents[agentID].state[-1],
                     action_vw[0], action_vw[1])
 
@@ -224,10 +170,11 @@ class setTrackingEnv2(maTrackingBase):
             observation.append([r, alpha, r_dot_b, alpha_dot_b, logdetcov, observed])
 
         return torch.tensor(observation,dtype=torch.float32)
-    '''
-    Returns a dictionary of agents that are within communication range
-    '''
+    
     def communicate_graph(self):
+        '''
+        Returns a dictionary of agents that are within communication range
+        '''
         agent_comms_dict = {}
 
         for i, agent_i in enumerate(self.agents):
@@ -236,7 +183,7 @@ class setTrackingEnv2(maTrackingBase):
                                                         xy_base=agent_i.state[:2],
                                                         theta_base=agent_i.state[2])
 
-                if (r <= self.communication_range):
+                if i != j and (r <= self.communication_range):
                     if agent_i.agent_id not in agent_comms_dict.keys():
                         agent_comms_dict[i] = [j]
                     else:
@@ -314,7 +261,7 @@ class setTrackingEnv2(maTrackingBase):
 
 
         # Get all rewards after all agents and targets move (t -> t+1)
-        reward, reward_dict,done, mean_nlogdetcov = self.get_reward(observed, self.is_training)
+        reward, reward_dict, done, mean_nlogdetcov = self.get_reward(observed, self.is_training)
         done_dict['__all__'], info_dict['mean_nlogdetcov'] = done, mean_nlogdetcov
 
         info_dict['reward_all'] = reward_dict

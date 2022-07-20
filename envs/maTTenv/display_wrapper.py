@@ -55,8 +55,8 @@ class Display2D(Wrapper):
         num_targets = self.env_core.nb_targets
         if type(self.env_core.targets) == list:
             target_true_pos = [self.env_core.targets[i].state[:2] for i in range(num_targets)]
-            target_b_state = [[self.env_core.agents[i].belief[j].state for j in range(num_targets)]for i in range(self.num_agents)] # state[3:5]
-            target_cov = [[self.env_core.agents[i].belief[j].cov for j in range(num_targets)]for i in range(self.num_agents)]
+            target_b_state = [[self.env_core.agents[i].belief[j].state for j in range(num_targets)] for i in range(self.num_agents)] # state[3:5]
+            target_cov = [[self.env_core.agents[i].belief[j].cov for j in range(num_targets)] for i in range(self.num_agents)]
         else:
             target_true_pos = self.env_core.targets.state[:,:2]
             target_b_state = self.env_core.belief_targets.state[:,:2]  # state[3:5]

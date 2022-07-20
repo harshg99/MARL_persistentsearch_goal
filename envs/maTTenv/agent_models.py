@@ -53,7 +53,7 @@ class Agent(object):
 
         intermediateBelief = deepcopy(self.belief)
         if len(comms_recv_beliefs)==0:
-            return
+            return intermediateBelief
 
         # for each belief target
         for target_id in range(len(intermediateBelief)):
@@ -65,7 +65,7 @@ class Agent(object):
                     # update list
                     intermediateBelief[target_id].state = comms_recv_beliefs[neigh][target_id].state
                     intermediateBelief[target_id].cov = comms_recv_beliefs[neigh][target_id].cov
-        #print("updated comm belief")
+
         return intermediateBelief
 
     def range_check(self):

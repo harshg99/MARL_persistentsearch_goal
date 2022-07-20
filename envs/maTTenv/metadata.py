@@ -4,7 +4,7 @@ import numpy as np
 METADATA_v1 = {   
         'version' : 1,
         'sensor_r': 10.0,
-        'comms_r': 15.0,
+        'comms_r': 20.0,
         'fov' : 360,
         'sensor_r_sd': 0.2, # sensor range noise.
         'sensor_b_sd': 0.01, # sensor bearing noise.
@@ -24,10 +24,10 @@ METADATA_v1 = {
     }
 
 # medium
-METADATA_v2 = {   
+METADATA_v2 = {
         'version' : 1,
         'sensor_r': 10.0,
-        'comms_r': 15.0,
+        'comms_r': 20.0,
         'fov' : 360,
         'sensor_r_sd': 0.2, # sensor range noise.
         'sensor_b_sd': 0.01, # sensor bearing noise.
