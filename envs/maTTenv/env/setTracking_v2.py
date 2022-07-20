@@ -318,7 +318,7 @@ class setTrackingEnv2(maTrackingBase):
 
         info_dict['reward_all'] = reward_dict
 
-        return obs_dict, reward, done_dict, info_dict
+        return obs_dict, reward, done, info_dict
 
     def reward_fun(self, nb_targets, belief_targets, is_training=True, c_mean=0.1,scaled = False):
         #TODO: reward should be per agent
