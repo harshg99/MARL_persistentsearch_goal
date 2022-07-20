@@ -58,6 +58,8 @@ def parse_args():
         help="the learning rate of the optimizer")
     parser.add_argument("--num_envs", type=int, default=4,
         help="the number of parallel game environments")
+    parser.add_argument("--reward_type", type=str , default='Max',
+                        help="type of reward structure")
     parser.add_argument("--num_steps", type=int, default=128,
         help="the number of steps to run in each environment per policy rollout")
     parser.add_argument("--anneal_lr", type=lambda x: bool(strtobool(x)), default=True, nargs="?", const=True,
@@ -155,6 +157,7 @@ def train(save_dir, args):
                     is_training=True,
                     num_envs=args.num_envs,
                     scaled=args.scaled,
+                    reward_type = args.reward_type
                     )
     # Create env function
     # env_fn = lambda : env

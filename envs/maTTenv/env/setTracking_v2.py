@@ -44,6 +44,7 @@ class setTrackingEnv2(maTrackingBase):
         self.id = 'setTracking-v2'
         self.metadata = self.id
         self.scaled = kwargs["scaled"]
+        self.reward_type = kwargs["reward_type"]
         self.nb_agents = num_agents #only for init, will change with reset()
         self.nb_targets = num_targets #only for init, will change with reset()
         self.agent_dim = 3
@@ -331,11 +332,18 @@ class setTrackingEnv2(maTrackingBase):
         reward = c_mean * r_detcov_sum
 
         reward_dict = []
-        for id,agent in enumerate(self.agents):
-            detcov = [LA.det(b.cov) for b in agent.belief]
-            detcov = np.ravel(detcov)
-            detcov_max = - np.log(np.max(detcov))
-            reward_dict.append(c_mean*detcov_max)
+        if self.reward_type=="Max":
+            for id,agent in enumerate(self.agents):
+                detcov = [LA.det(b.cov) for b in agent.belief]
+                detcov = np.ravel(detcov)
+                detcov_max = - np.log(np.max(detcov))
+                reward_dict.append(c_mean*detcov_max)
+        elif self.reward_type=="Mean":
+            for id,agent in enumerate(self.agents):
+                detcov = [LA.det(b.cov) for b in agent.belief]
+                detcov = np.ravel(detcov)
+                detcov_max = - np.log(detcov).mean()
+                reward_dict.append(c_mean*detcov_max)
 
         mean_nlogdetcov = None
         if not(is_training):
