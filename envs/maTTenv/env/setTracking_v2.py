@@ -112,7 +112,7 @@ class setTrackingEnv2(maTrackingBase):
 
 
     def get_reward(self, observed=None, is_training=True):
-        return self.reward_fun(self.nb_targets,self.belief_targets,is_training,c_mean=0.1,scaled = False)
+        return self.reward_fun(self.agents, self.nb_targets,self.belief_targets,is_training,c_mean=0.1,scaled = self.scaled)
     
     def reset(self,**kwargs):
         """
@@ -268,7 +268,7 @@ class setTrackingEnv2(maTrackingBase):
 
         return obs_dict, reward, done, info_dict
 
-    def reward_fun(self, nb_targets, belief_targets, is_training=True, c_mean=0.1,scaled = False):
+    def reward_fun(self, agents, nb_targets, belief_targets, is_training=True, c_mean=0.1,scaled = False):
         #TODO: reward should be per agent
         globaldetcov = [LA.det(b_target.cov) for b_target in belief_targets]
 
@@ -291,7 +291,18 @@ class setTrackingEnv2(maTrackingBase):
                 detcov = np.ravel(detcov)
                 detcov_max = - np.log(detcov).mean()
                 reward_dict.append(c_mean*detcov_max)
-
+        
+        if scaled:
+            for agent_index in range(len(reward_dict)):
+                distance = [np.linalg.norm(agents[agent_index].state[:2] - b_target.state[:2]) for b_target in agents[agent_index].belief]
+                distance = np.array(distance) # distance.sort()
+                if distance.shape[0] > 1:
+                    indices = np.argsort(distance)
+                    fraction = np.sum(distance[indices[1:]])/distance[indices[0]]
+                else:
+                    fraction = 1/distance[0]
+                reward_dict[agent_index] *= fraction
+        
         mean_nlogdetcov = None
         if not(is_training):
             logdetcov = [np.log(LA.det(b_target.cov)) for b_target in belief_targets[:nb_targets]]
@@ -312,16 +323,7 @@ def reward_fun(scaled, agents, nb_targets, belief_targets, is_training=True, c_m
     reward = [c_mean * -np.mean(np.log(agent_detcov)) for agent_detcov in detcov]
     
     # reward = np.sum(np.where(observed, reward, -1))
-    if scaled:
-        for agent_index in range(len(reward)):
-            distance = [np.linalg.norm(agents[agent_index].state[:2] - b_target.state[:2]) for b_target in belief_targets[agent_index]]
-            distance = np.array(distance) # distance.sort()
-            if distance.shape[0] > 1:
-                indices = np.argsort(distance)
-                fraction = np.sum(distance[indices[1:]])/distance[indices[0]]
-            else:
-                fraction = 1/distance[0]
-            reward[agent_index] *= fraction
+    
     #
     mean_nlogdetcov = None
     if not(is_training):

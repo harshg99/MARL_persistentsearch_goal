@@ -28,7 +28,8 @@ class Display2D(Wrapper):
         self.mapmin = self.env_core.MAP.mapmin
         self.mapmax = self.env_core.MAP.mapmax
         self.mapres = self.env_core.MAP.mapres
-        self.fig = plt.figure(self.figID)
+        #self.fig = plt.figure(self.figID)
+        self.figs = [plt.figure(i) for i in range(env.num_agents)]
         self.n_frames = 0 
         self.skip = skip
         self.c_cf = np.sqrt(-2*np.log(1-confidence))
@@ -38,7 +39,8 @@ class Display2D(Wrapper):
         y = obs[:,1]
 
     def close(self):
-        plt.close(self.fig)
+        for fig in self.figs:
+            plt.close(fig)
 
     def render(self, mode='empty', record=False, traj_num=0, batch_outputs=None):
         if not hasattr(self, 'traj'):
@@ -62,11 +64,9 @@ class Display2D(Wrapper):
             target_b_state = self.env_core.belief_targets.state[:,:2]  # state[3:5]
             target_cov = self.env_core.belief_targets.cov
 
-        if self.n_frames%self.skip == 0:
-            self.fig.clf()       
+        if self.n_frames%self.skip == 0:     
             for i in range(num_agents):
-                figure = plt.figure(i)
-                
+                figure = self.figs[i]
                 figure.clf()
                 new_plot = figure.add_subplot(111)
                 for ii in range(num_agents):
@@ -139,9 +139,13 @@ class Video2D(Wrapper):
         super(Video2D, self).__init__(env)
         self.local_view = local_view
         self.skip = skip
-        self.moviewriter = animation.FFMpegWriter()
-        fname = os.path.join(dirname, 'eval_%da%dt.mp4'%(env.nb_agents,env.nb_targets))
-        self.moviewriter.setup(fig=env.fig, outfile=fname, dpi=dpi)
+        
+        self.moviewriters = []
+        for i in range(env.num_agents):
+            moviewriter = animation.FFMpegWriter()
+            fname = os.path.join(dirname, f'eval_{env.nb_agents}a{env.nb_targets}t_agent{i}.mp4')
+            moviewriter.setup(fig=env.figs[i], outfile=fname, dpi=dpi)
+            self.moviewriters.append(moviewriter)
         if self.local_view:
             self.moviewriter0 = animation.FFMpegWriter()
             fname0 = os.path.join(dirname, 'train_local_%d.mp4'%np.random.randint(0,20))
@@ -152,7 +156,7 @@ class Video2D(Wrapper):
         if self.n_frames % self.skip == 0:
         #if traj_num % self.skip == 0:
             self.env.render(record=True, *args, **kwargs)
-        self.moviewriter.grab_frame()
+        [self.moviewriters[i].grab_frame() for i in range(self.env.num_agents)]
         if self.local_view:
             self.moviewriter0.grab_frame()
         self.n_frames += 1

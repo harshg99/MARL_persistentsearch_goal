@@ -131,7 +131,7 @@ class Test:
                 for env_i in range(args.num_envs):
                     writer.add_scalar(f"charts/episodic_return_env_{env_i}_eval", episode_rew[env_i], ep)
             if args.record :
-                env.envs[0].moviewriter.finish()
+                [moviewriter.finish() for moviewriter in env.envs[0].moviewriters]
             #if args.ros_log :
             #    ros_log.save(args.log_dir)
 

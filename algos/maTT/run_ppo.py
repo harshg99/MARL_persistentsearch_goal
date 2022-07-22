@@ -58,7 +58,7 @@ def parse_args():
         help="the learning rate of the optimizer")
     parser.add_argument("--num_envs", type=int, default=4,
         help="the number of parallel game environments")
-    parser.add_argument("--reward_type", type=str , default='Max',
+    parser.add_argument("--reward_type", type=str , default='Mean',
                         help="type of reward structure")
     parser.add_argument("--num_steps", type=int, default=128,
         help="the number of steps to run in each environment per policy rollout")
@@ -123,7 +123,7 @@ def parse_args():
     parser.add_argument('--render', type=int, default=0)
     parser.add_argument('--nb_test_eps',type=int, default=50)
     parser.add_argument('--log_dir', type=str, default='./results/maTT')
-    parser.add_argument('--log_fname', type=str, default='model.pt')
+    parser.add_argument('--log_fname', type=str, default='last_model.pt')
     parser.add_argument('--repeat', type=int, default=1)
     parser.add_argument('--eval_type', choices=['random', 'fixed_4', 
                                                 'fixed_2', 'fixed_nb'], default='fixed_nb')
@@ -183,7 +183,8 @@ def test(args):
                     num_targets=args.nb_targets,
                     is_training=False,
                     num_envs=args.num_envs,
-                    scaled=args.scaled
+                    scaled=args.scaled,
+                    reward_type = args.reward_type
                     )
 
     # Load saved policy
