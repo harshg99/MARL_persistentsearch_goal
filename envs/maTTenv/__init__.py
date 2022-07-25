@@ -47,7 +47,7 @@ def make(env_name, render=False, figID=0, record=False, directory='',
     
     
     if "num_envs" in kwargs and kwargs["num_envs"] > 0:
-        env = make_vec_env(lambda: env, n_envs=kwargs["num_envs"], vec_env_cls=gym.vector.SyncVectorEnv)
+        env = make_vec_env(lambda: env, n_envs=kwargs["num_envs"], vec_env_cls=gym.vector.AsyncVectorEnv)
         env = maTimeLimitVec(env, max_episode_steps=T_steps)
     else:
         env = maTimeLimit(env, max_episode_steps=T_steps)

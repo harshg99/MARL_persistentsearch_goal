@@ -32,8 +32,7 @@ BASE_DIR = os.path.dirname('/'.join(str.split(os.path.realpath(__file__),'/')[:-
 def parse_args():
     # fmt: off
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    #parser.add_argument("--exp-name", type=str, default=os.path.basename(__file__).rstrip(".py"),
-    #    help="the name of this experiment")
+    
     parser.add_argument("--seed", type=int, default=1,
         help="seed of the experiment")
     parser.add_argument("--torch-deterministic", type=lambda x: bool(strtobool(x)), default=True, nargs="?", const=True,
@@ -46,12 +45,7 @@ def parse_args():
         help="the wandb's project name")
     parser.add_argument("--wandb-entity", type=str, default=None,
         help="the entity (team) of wandb's project")
-    #parser.add_argument("--capture-video", type=lambda x: bool(strtobool(x)), default=False, nargs="?", const=True,
-    #    help="weather to capture videos of the agent performances (check out `videos` folder)")
-
-    # Algorithm specific arguments
-    #parser.add_argument("--env-id", type=str, default="CartPole-v1",
-    #    help="the id of the environment")
+    
     parser.add_argument("--total_timesteps", type=int, default=10000000,
         help="total timesteps of the experiments")
     parser.add_argument("--learning_rate", type=float, default=2.5e-4,
@@ -95,30 +89,11 @@ def parse_args():
     
     
     ## maTT
-    
     parser.add_argument('--env', help='environment ID', default='setTracking-v2')
     parser.add_argument('--map', type=str, default="emptyMed")
     parser.add_argument('--nb_agents', type=int, default=4)
     parser.add_argument('--nb_targets', type=int, default=4)
-    #parser.add_argument('--seed', help='RNG seed', type=int, default=0)
     parser.add_argument('--mode', choices=['train', 'test', 'test-behavior'], default='train')
-    #parser.add_argument('--steps_per_epoch', type=int, default=25000)
-    #parser.add_argument('--epochs', type=int, default=20)
-    #parser.add_argument('--batch_size', type=int, default=256)
-    #parser.add_argument('--alpha', type=float, default=0.4)
-    #parser.add_argument('--gamma', type=float, default=.99)
-    #parser.add_argument('--polyak', type=float, default=0.999) #tau in polyak averaging
-    #parser.add_argument('--hiddens', type=int, default=128)
-    #parser.add_argument('--learning_rate', type=float, default=0.001)
-    #parser.add_argument('--learning_rate_period', type=float, default=0.7) #Back half portion with cosine lr schedule
-    #parser.add_argument('--grad_clip', type=int, default=0.2)
-    #parser.add_argument('--start_steps', type=int, default=20000)
-    #parser.add_argument('--update_after', type=int, default=20000)
-    #parser.add_argument('--num_eval_episodes', type=int, default=2) #During training
-    #parser.add_argument('--replay_size', type=int, default=int(1e6))
-    #parser.add_argument('--max_ep_len', type=int, default=200)
-    #parser.add_argument('--checkpoint_freq', type=int, default=1)
-
     parser.add_argument('--record',type=int, default=0)
     parser.add_argument('--render', type=int, default=0)
     parser.add_argument('--nb_test_eps',type=int, default=50)

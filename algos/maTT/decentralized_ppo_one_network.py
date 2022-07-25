@@ -56,6 +56,8 @@ def decentralized_ppo(envs, model, args, run_name):
     torch.manual_seed(args.seed)
     torch.backends.cudnn.deterministic = args.torch_deterministic
 
+    torch.set_num_threads(args.torch_threads)
+
     device = torch.device("cuda" if torch.cuda.is_available() and args.cuda else "cpu")
 
     

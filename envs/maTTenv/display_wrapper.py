@@ -11,6 +11,7 @@ matplotlib.use('TkAgg')
 from matplotlib import pyplot as plt
 from matplotlib import patches
 from matplotlib import animation
+import matplotlib.colors as mcolors
 from envs.maTTenv.metadata import *
 
 class Display2D(Wrapper):
@@ -94,7 +95,7 @@ class Display2D(Wrapper):
                     new_plot.add_patch(comm_arc)
                     self.traj[ii][0].append(agent_pos[ii][0])
                     self.traj[ii][1].append(agent_pos[ii][1])
-
+                target_colors = list(mcolors.TABLEAU_COLORS.values())
                 for jj in range(num_targets):
                     new_plot.plot(self.traj_y[jj][0], self.traj_y[jj][1], 'r.', markersize=2)
                     new_plot.plot(target_true_pos[jj][0], target_true_pos[jj][1], marker='o', markersize=5, 
@@ -104,12 +105,13 @@ class Display2D(Wrapper):
 
                     # Belief on target
                     new_plot.plot(target_b_state[i][jj][0], target_b_state[i][jj][1], marker='o', markersize=10, 
-                        linewidth=5, markerfacecolor='none', markeredgecolor='g')
+                        linewidth=5 , markerfacecolor='none', markeredgecolor=target_colors[jj % len(target_colors)])
+                    
                     eig_val, eig_vec = LA.eig(target_cov[i][jj][:2,:2])
                     belief_target = patches.Ellipse((target_b_state[i][jj][0], target_b_state[i][jj][1]), 
                                 2*np.sqrt(eig_val[0])*self.c_cf, 2*np.sqrt(eig_val[1])*self.c_cf, 
                                 angle = 180/np.pi*np.arctan2(eig_vec[0][1],eig_vec[0][0]) ,fill=True,
-                                zorder=2, facecolor='g', alpha=0.5)
+                                zorder=2, facecolor=target_colors[jj % len(target_colors)], alpha=0.5)
                     new_plot.add_patch(belief_target)
                     self.traj_y[jj][0].append(target_true_pos[jj][0])
                     self.traj_y[jj][1].append(target_true_pos[jj][1])
