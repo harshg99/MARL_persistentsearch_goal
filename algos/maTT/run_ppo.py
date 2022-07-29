@@ -157,7 +157,7 @@ def test(args):
                     num_agents=args.nb_agents,
                     num_targets=args.nb_targets,
                     is_training=False,
-                    num_envs=args.num_envs,
+                    num_envs=1,
                     scaled=args.scaled,
                     reward_type = args.reward_type
                     )

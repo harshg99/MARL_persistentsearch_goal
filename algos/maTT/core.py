@@ -123,20 +123,24 @@ class PPO(nn.Module):
         super().__init__()
         self.envs = envs
         self.args = args
+        
         key = list(envs.single_observation_space.keys())[0]
+        obs_dim = np.array(envs.single_observation_space[key].shape).prod()
+        act_dim = envs.single_action_space.n
+        
         self.critic = nn.Sequential(
-            layer_init(nn.Linear(np.array(envs.single_observation_space[key].shape).prod(), 64)),
+            layer_init(nn.Linear(obs_dim, 64)),
             nn.Tanh(),
             layer_init(nn.Linear(64, 64)),
             nn.Tanh(),
             layer_init(nn.Linear(64, 1), std=1.0),
         )
         self.actor = nn.Sequential(
-            layer_init(nn.Linear(np.array(envs.single_observation_space[key].shape).prod(), 64)),
+            layer_init(nn.Linear(obs_dim, 64)),
             nn.Tanh(),
             layer_init(nn.Linear(64, 64)),
             nn.Tanh(),
-            layer_init(nn.Linear(64, envs.single_action_space.n), std=0.01),
+            layer_init(nn.Linear(64, act_dim), std=0.01),
         )
         self.device = torch.device("cuda" if torch.cuda.is_available() and args.cuda else "cpu")
 
