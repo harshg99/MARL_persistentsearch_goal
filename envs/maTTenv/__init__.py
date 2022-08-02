@@ -12,7 +12,7 @@ def make(env_name, render=False, figID=0, record=False, directory='',
         'classic_mdp','target_tracking']
     """
     if T_steps is None:
-        T_steps = 200
+        T_steps = 1000
 
     if env_name == 'setTracking-v0':
         from envs.maTTenv.env.setTracking_v0 import setTrackingEnv0
@@ -35,7 +35,7 @@ def make(env_name, render=False, figID=0, record=False, directory='',
     else:
         raise ValueError('No such environment exists.')
 
-    # import pdb; pdb.set_trace()
+    #import pdb; pdb.set_trace()
     
     env = env0
     if render:
@@ -45,12 +45,14 @@ def make(env_name, render=False, figID=0, record=False, directory='',
         from envs.maTTenv.display_wrapper import Video2D
         env = Video2D(env, dirname = directory)
     
-    
-    if "num_envs" in kwargs and kwargs["num_envs"] > 1:
+    if render:
+        env = make_vec_env(lambda: env, n_envs=kwargs["num_envs"], vec_env_cls=gym.vector.SyncVectorEnv)
+        env = maTimeLimitVec(env, max_episode_steps=T_steps)
+    elif "num_envs" in kwargs and kwargs["num_envs"] > 1:
         env = make_vec_env(lambda: env, n_envs=kwargs["num_envs"], vec_env_cls=gym.vector.AsyncVectorEnv)
         env = maTimeLimitVec(env, max_episode_steps=T_steps)
     else:
-        env = make_vec_env(lambda: env, n_envs=kwargs["num_envs"], vec_env_cls=gym.vector.SyncVectorEnv)
-        env = maTimeLimitVec(env, max_episode_steps=T_steps)
+        raise ValueError("weird combo of inputs, investigate")
+        
     
     return env

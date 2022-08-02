@@ -75,7 +75,7 @@ class setTrackingEnv2(maTrackingBase):
             self.target_true_noise_sd = METADATA['const_q_true'] * np.concatenate((
                         np.concatenate((self.sampling_period**2/2*np.eye(2), self.sampling_period/2*np.eye(2)), axis=1),
                         np.concatenate((self.sampling_period/2*np.eye(2), self.sampling_period*np.eye(2)),axis=1) ))
-
+        
         # Build a robot 
         self.setup_agents()
         # Build a target
@@ -265,8 +265,42 @@ class setTrackingEnv2(maTrackingBase):
         done_dict['__all__'], info_dict['mean_nlogdetcov'] = done, mean_nlogdetcov
 
         info_dict['reward_all'] = reward_dict
+        info_dict['metrics'] = [self.calculate_total_uncertainity(), self.calculate_max_uncertainity()]
 
         return obs_dict, reward, done, info_dict
+
+
+    def calculate_total_uncertainity(self):
+        """
+        Calculating metric
+
+        - sum(tr(cov) over all beliefs)
+        
+        """
+        total_uncertainity = 0
+
+
+        for agent in self.agents:
+            total_uncertainity += sum([np.trace(b_target.cov) for b_target in agent.belief])
+        
+        return total_uncertainity
+
+    def calculate_max_uncertainity(self):
+        """
+        Calculating metric
+
+        - sum(max(tr(cov)) over targets)
+        
+        """
+        max_uncertainity = [0 for _ in range(self.nb_targets)]
+        for agent in self.agents:
+            for i, b_target in enumerate(agent.belief):
+                uncertainity = np.trace(b_target.cov)
+                if max_uncertainity[i] < uncertainity:
+                    max_uncertainity[i] = uncertainity
+                
+        return sum(max_uncertainity)
+
 
     def reward_fun(self, agents, nb_targets, belief_targets, is_training=True, c_mean=0.1,scaled = False):
         #TODO: reward should be per agent

@@ -98,4 +98,4 @@ METADATAS = {
     "4":METADATA_v4
 }
 ##Beliefs are initialized near target
-METADATA=METADATAS["2"]
+METADATA=METADATAS["4"]

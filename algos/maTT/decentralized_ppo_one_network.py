@@ -27,7 +27,7 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.utils.tensorboard import SummaryWriter
 
-def decentralized_ppo(envs, model, args, run_name):
+def decentralized_ppo(envs, model, args, run_name, notes=None):
     """
     env_fn: 
         lambda: env
@@ -43,6 +43,7 @@ def decentralized_ppo(envs, model, args, run_name):
             name=run_name,
             monitor_gym=True,
             save_code=True,
+            notes=notes
         )
     writer = SummaryWriter(f"runs/{run_name}")
     writer.add_text(
@@ -97,6 +98,7 @@ def decentralized_ppo(envs, model, args, run_name):
     logprobs = torch.zeros((args.num_steps, args.num_envs, args.nb_agents)).to(device)
 
     rewards = torch.zeros((args.num_steps, args.num_envs,args.nb_agents)).to(device)
+    metrics = torch.zeros((args.num_steps, args.num_envs, 2)).to(device)
 
     dones = torch.zeros((args.num_steps, args.num_envs)).to(device)
     values = torch.zeros((args.num_steps, args.num_envs, args.nb_agents)).to(device)
@@ -141,14 +143,18 @@ def decentralized_ppo(envs, model, args, run_name):
                 rewards[step] = torch.tensor(np.stack(info['reward_all'])).to(device)
             else:
                 rewards[step] = torch.tensor(np.repeat(reward,  args.nb_agents, axis=0).reshape(args.num_envs, args.nb_agents)).to(device)
-            
+            metrics[step] = torch.from_numpy(np.stack(info['metrics']))
             next_done = torch.Tensor(done).to(device)
             if torch.sum(next_done).item() == args.num_envs:
                 # from IPython import embed; embed()
                 for env_i in range(args.num_envs):
                     print(f"global_step={global_step}, episodic_return_env={env_i}={torch.sum(rewards[step - ep_length:step, env_i]).item()}")
                     writer.add_scalar(f"charts/episodic_return_env_{env_i}", torch.sum(rewards[step - ep_length:step, env_i]).item(), global_step)
+                    writer.add_scalar(f"evaluation_total_uncertainity_env_{env_i}", torch.sum(rewards[step - ep_length:step, env_i, 0]).item(), global_step)
+                    writer.add_scalar(f"evaluation_max_uncertainity_env_{env_i}", torch.sum(rewards[step - ep_length:step, env_i, 1]).item(), global_step)
+                    
                 writer.add_scalar("charts/episodic_length", ep_length, global_step)
+                
                 ep_length = 0
                 envs.reset()
                 break

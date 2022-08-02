@@ -2,6 +2,7 @@ import datetime, json, os, argparse, time
 import pickle, tabulate
 import matplotlib
 from matplotlib import pyplot as plt
+from tqdm import tqdm
 import numpy as np
 import os.path as osp
 import torch
@@ -21,7 +22,7 @@ def load_pytorch_policy(fpath, fname, model, seed):
     assert os.path.exists(fname)
     map_location = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
     model.load_state_dict(torch.load(fname, map_location))
-
+    
     # make function for producing an action given a single state
     def get_action(x, deterministic=True):
         with torch.no_grad():
@@ -46,6 +47,7 @@ class Test:
         pass
 
     def test(self, args, env, act, torch_threads=1):
+        num_envs = 1 # hard-coded, only one env for evaluation
         run_name = args.log_dir.split(os.sep)[-1] + "_eval"
         if args.track:
             import wandb
@@ -90,7 +92,7 @@ class Test:
         #if args.ros_log:
         #    from envs.target_tracking.ros_wrapper import RosLog
         #    ros_log = RosLog(num_targets=args.nb_targets, wrapped_num=args.ros + args.render + args.record + 1)
-
+        
 
         total_nlogdetcov = []
         total_intruders = []
@@ -100,21 +102,20 @@ class Test:
             ep_intruders = []
             time_elapsed = ['Elapsed Time (sec)']
 
-            while(ep < args.nb_test_eps): # test episode
+            for ep in tqdm(range(args.nb_test_eps)): # test episode
                 ep += 1
                 s_time = time.time()
                 episode_rew, nlogdetcov, ep_len, intruders = 0, 0, 0, 0
-                done = np.array([False for _ in range(args.num_envs)])
-                print(params)
+                done = np.array([False for _ in range(num_envs)])
                 obs = env.reset() # **params)
 
-                while np.sum(done) != args.num_envs:
+                while np.sum(done) != num_envs:
                     #
                     if args.render:
                         env.envs[0].render()
                     #if args.ros_log:
                     #    ros_log.log(env)
-                    action_dict = [{} for _ in range(args.num_envs)]
+                    action_dict = [{} for _ in range(num_envs)]
                     for agent_id, o in obs.items():
                         for env_i in range(o.shape[0]):
                             action_dict[env_i][agent_id] = act(o[env_i]).item() # , deterministic=False)
@@ -123,13 +124,14 @@ class Test:
                     episode_rew += rew
                     nlogdetcov += info['mean_nlogdetcov']
                     ep_len += 1
+                    # from IPython import embed; embed()
 
                 time_elapsed.append(time.time() - s_time)
                 ep_nlogdetcov.append(nlogdetcov)
                 
                 print(f"Ep.{ep} - Episode reward : {episode_rew}, Episode nLogDetCov : {nlogdetcov}")
-                for env_i in range(args.num_envs):
-                    writer.add_scalar(f"charts/episodic_return_env_{env_i}_eval", episode_rew[env_i], ep)
+                #for env_i in range(args.num_envs):
+                writer.add_scalar(f"charts/episodic_return_env_0_eval", episode_rew, ep)
             if args.record :
                 [moviewriter.finish() for moviewriter in env.envs[0].moviewriters]
             #if args.ros_log :

@@ -112,7 +112,7 @@ def parse_args():
 
 
 
-def train(save_dir, args):
+def train(save_dir, args, notes=None):
     run_name = save_dir.split(os.sep)[-1]
     save_dir_0 = os.path.join(save_dir, f"seed_{args.seed}")
     if not os.path.exists(save_dir_0):
@@ -141,9 +141,11 @@ def train(save_dir, args):
         fname = os.path.join("runs", run_name, f"seed_{args.seed}", args.log_fname)
         map_location = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
         model.load_state_dict(torch.load(fname, map_location))
-    trained_model = decentralized_ppo(env, model, args, run_name)
+    trained_model = decentralized_ppo(env, model, args, run_name, notes)
     # final model saving  
     torch.save(trained_model.state_dict(), os.path.join("runs", run_name, f'seed_{args.seed}', f'last_model.pt'))
+    if not args.track:
+        print(f"Finished and saved model for training run={run_name}")
 
 def test(args):
     from algos.maTT.evaluation import Test, load_pytorch_policy
@@ -213,7 +215,7 @@ if __name__ == '__main__':
 
         for _ in range(args.repeat):
             print(f"===== TRAIN A TARGET TRACKING RL AGENT : SEED {args.seed} =====")
-            model = train(save_dir, args)
+            model = train(save_dir, args, notes)
             json.dump(vars(args), open(os.path.join(save_dir, f"seed_{args.seed}", 'learning_prop.json'), 'w'))
             args.seed += 1
 
