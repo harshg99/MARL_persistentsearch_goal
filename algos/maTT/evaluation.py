@@ -106,6 +106,7 @@ class Test:
                 ep += 1
                 s_time = time.time()
                 episode_rew, nlogdetcov, ep_len, intruders = 0, 0, 0, 0
+                evaluation_total_uncertainity, evaluation_max_uncertainity = 0, 0
                 done = np.array([False for _ in range(num_envs)])
                 obs = env.reset() # **params)
 
@@ -119,19 +120,25 @@ class Test:
                     for agent_id, o in obs.items():
                         for env_i in range(o.shape[0]):
                             action_dict[env_i][agent_id] = act(o[env_i]).item() # , deterministic=False)
-                    #import pdb; pdb.set_trace()
+                    
                     obs, rew, done, info = env.step(action_dict)
                     episode_rew += rew
                     nlogdetcov += info['mean_nlogdetcov']
                     ep_len += 1
+                    evaluation_total_uncertainity += info['metrics'][0][0]
+                    evaluation_max_uncertainity += info['metrics'][0][1]
                     # from IPython import embed; embed()
 
                 time_elapsed.append(time.time() - s_time)
                 ep_nlogdetcov.append(nlogdetcov)
                 
+                #import pdb; pdb.set_trace()
                 print(f"Ep.{ep} - Episode reward : {episode_rew}, Episode nLogDetCov : {nlogdetcov}")
                 #for env_i in range(args.num_envs):
                 writer.add_scalar(f"charts/episodic_return_env_0_eval", episode_rew, ep)
+                writer.add_scalar(f"evaluation_total_uncertainity_env_0_eval", evaluation_total_uncertainity, ep)
+                writer.add_scalar(f"evaluation_max_uncertainity_env_0_eval", evaluation_max_uncertainity, ep)
+                    
             if args.record :
                 [moviewriter.finish() for moviewriter in env.envs[0].moviewriters]
             #if args.ros_log :
