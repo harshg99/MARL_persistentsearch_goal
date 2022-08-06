@@ -50,7 +50,7 @@ class Test:
 
     def test(self, args, env, act, torch_threads=1):
         num_envs = 1 # hard-coded, only one env for evaluation
-        run_name = args.log_dir.split(os.sep)[-1] + "_eval"
+        run_name = args.log_dir.split(os.sep)[-1] + "_eval_at_" + datetime.datetime.now().strftime("%m%d%H%M") 
         if args.track:
             import wandb
 
