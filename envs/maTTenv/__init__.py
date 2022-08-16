@@ -15,6 +15,7 @@ def make(env_name, render=False, figID=0, record=False, directory='',
         T_steps = 1000
     kwargs['T_MAX_STEPS'] = T_steps
 
+
     if env_name == 'setTracking-v0':
         from envs.maTTenv.env.setTracking_v0 import setTrackingEnv0
         env0 = setTrackingEnv0(num_agents=num_agents, num_targets=num_targets, **kwargs)
@@ -47,14 +48,14 @@ def make(env_name, render=False, figID=0, record=False, directory='',
         env = Video2D(env, dirname = directory)
     
     if render:
-        env = make_vec_env(lambda: env, n_envs=kwargs["num_envs"], vec_env_cls=gym.vector.SyncVectorEnv)
+        env = make_vec_env(lambda: env, n_envs=kwargs["num_envs"], vec_env_cls=gym.vector.AsyncVectorEnv)
         env = maTimeLimitVec(env, max_episode_steps=T_steps)
     elif "num_envs" in kwargs and kwargs["num_envs"] > 1:
-        env = make_vec_env(lambda: env, n_envs=kwargs["num_envs"], vec_env_cls=gym.vector.SyncVectorEnv)
+        env = make_vec_env(lambda: env, n_envs=kwargs["num_envs"], vec_env_cls=gym.vector.AsyncVectorEnv)
         env = maTimeLimitVec(env, max_episode_steps=T_steps)
     else:
         raise ValueError("weird combo of inputs, investigate")
-
     # UNpacked Observation space per agent
     env.full_observation_space = full_observation_space
+
     return env

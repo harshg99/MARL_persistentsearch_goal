@@ -60,8 +60,10 @@ class setTrackingEnv2(maTrackingBase):
                                 np.concatenate((self.MAP.mapmax, [METADATA['target_vel_limit'], METADATA['target_vel_limit']]))]
 
         rel_vel_limit = METADATA['target_vel_limit'] + METADATA['action_v'][0] # Maximum relative speed
+
+        # normalize
         self.limit['state'] = [np.array(([0.0, 0.0, 0.0, -np.pi, -rel_vel_limit, -10*np.pi, -50.0, 0.0])),
-                               np.array(([1.0, 1.0, 600.0, np.pi, rel_vel_limit, 10*np.pi, 50.0, 2.0]))]
+                               np.array(([1.0, 1.0, np.sqrt(2), np.pi, rel_vel_limit, 10*np.pi, 50.0, 2.0]))]
 
         # TODO: based on Map bounds
         #self.cov_limit = (self.MAP.mapmax[0]-self.MAP.mapmin[0])*(self.MAP.mapmax[1]-self.MAP.mapmin[1])
@@ -201,13 +203,19 @@ class setTrackingEnv2(maTrackingBase):
                 observed = float(isObserved[jj])
             observation.append([self.agents[agentID].state[0]/self.MAP.mapmax[0],
                                 self.agents[agentID].state[1]/self.MAP.mapmax[1],
-                                r, alpha, r_dot_b, alpha_dot_b, logdetcov, observed])
+                                r/self.MAP.mapmax[0],
+                                alpha/self.limit['state'][1][-5],
+                                r_dot_b/self.limit['state'][1][-4],
+                                alpha_dot_b/self.limit['state'][1][-3],
+                                logdetcov/self.limit['state'][1][-2],
+                                observed])
 
         # Packing the observation
         observation = np.array(observation).flatten()
         agent_rendz_info = self.agents[agentID].get_agent_rendz_history()
         agent_rendz_info_flat = np.array(agent_rendz_info).flatten()
         observation = np.concatenate((agent_rendz_info_flat,observation),axis = -1)
+
 
         return torch.tensor(observation,dtype=torch.float32)
 

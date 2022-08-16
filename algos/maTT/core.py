@@ -134,18 +134,17 @@ class PPO(nn.Module):
 
         self.obs_dim = obs_dim
 
-        self.critic = nn.Sequential(
+        # shared parameters between actor and critic
+        self.backend = nn.Sequential(
             layer_init(nn.Linear(obs_dim['target'].prod(), 64)),
             nn.Tanh(),
             layer_init(nn.Linear(64, 64)),
-            nn.Tanh(),
+            nn.Tanh()
+        )
+        self.critic = nn.Sequential(
             layer_init(nn.Linear(64, 1), std=1.0),
         )
         self.actor = nn.Sequential(
-            layer_init(nn.Linear(obs_dim['target'].prod(), 64)),
-            nn.Tanh(),
-            layer_init(nn.Linear(64, 64)),
-            nn.Tanh(),
             layer_init(nn.Linear(64, self.act_dim), std=0.01),
         )
         self.device = torch.device("cuda" if torch.cuda.is_available() and args.cuda else "cpu")
@@ -168,6 +167,7 @@ class PPO(nn.Module):
         x_list = self.decode(x)
         x = x_list['target']
         x = x.view(-1, x.shape[-2] * x.shape[-1])
+        x = self.backend(x)
         return self.critic(x)
 
     def get_action_and_value(self, x, action=None):
@@ -178,6 +178,7 @@ class PPO(nn.Module):
         x_list = self.decode(x)
         x = x_list['target']
         x = x.view(-1, x.shape[-2] * x.shape[-1])
+        x = self.backend(x)
         logits = self.actor(x)
         probs = Categorical(logits=logits)
         if action is None:
@@ -249,6 +250,13 @@ class PPOAttention(nn.Module):
         self.envs = envs
         self.args = args
 
+        self.state_encoder = nn.Sequential(
+            layer_init(nn.Linear(self.obs_dim, 64)),
+            nn.Tanh(),
+            layer_init(nn.Linear(64, 64)),
+            nn.Tanh(),
+            layer_init(nn.Linear(64, 1), std=1.0),
+        )
         self.critic = nn.Sequential(
             layer_init(nn.Linear(self.obs_dim, 64)),
             nn.Tanh(),
