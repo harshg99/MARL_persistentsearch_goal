@@ -214,12 +214,12 @@ class setTrackingEnv2(maTrackingBase):
                 w = action_vw[1]
             observation.append([self.agents[agentID].state[0]/self.MAP.mapmax[0],
                                 self.agents[agentID].state[1]/self.MAP.mapmax[1],
-                                self.agents[agentID].state[2]/self.limit['state'][1][2],
-                                v / self.limit['state'][1][3],
-                                w / self.limit['state'][1][4],
+                                self.agents[agentID].state[2],
+                                v/self.MAP.mapmax[0],
+                                w,
                                 r/self.MAP.mapmax[0],
                                 alpha,
-                                r_dot_b,
+                                r_dot_b/self.MAP.mapmax[0],
                                 alpha_dot_b,
                                 logdetcov,
                                 observed])
