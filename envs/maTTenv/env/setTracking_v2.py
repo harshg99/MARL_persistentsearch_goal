@@ -218,10 +218,10 @@ class setTrackingEnv2(maTrackingBase):
                                 v / self.limit['state'][1][3],
                                 w / self.limit['state'][1][4],
                                 r/self.MAP.mapmax[0],
-                                alpha/self.limit['state'][1][-5],
-                                r_dot_b/self.limit['state'][1][-4],
-                                alpha_dot_b/self.limit['state'][1][-3],
-                                logdetcov/self.limit['state'][1][-2],
+                                alpha,
+                                r_dot_b,
+                                alpha_dot_b,
+                                logdetcov,
                                 observed])
 
 
