@@ -348,7 +348,7 @@ class setTrackingEnv2(maTrackingBase):
 
 
         for agent in self.agents:
-            total_uncertainity += sum([np.trace(b_target.cov) for b_target in agent.belief])
+            total_uncertainity += sum([np.sum(np.diag(b_target.cov)[:2]) for b_target in agent.belief])
         
         return total_uncertainity
 
@@ -362,7 +362,7 @@ class setTrackingEnv2(maTrackingBase):
         max_uncertainity = [0 for _ in range(self.nb_targets)]
         for agent in self.agents:
             for i, b_target in enumerate(agent.belief):
-                uncertainity = np.trace(b_target.cov)
+                uncertainity = np.sum(np.diag(b_target.cov)[:2])
                 if max_uncertainity[i] < uncertainity:
                     max_uncertainity[i] = uncertainity
                 
