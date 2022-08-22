@@ -7,7 +7,7 @@ from numpy import linalg as LA
 
 import pdb, os
 import matplotlib
-matplotlib.use('Agg')
+matplotlib.use('TkAgg')
 from matplotlib import pyplot as plt
 from matplotlib import patches
 from matplotlib import animation
