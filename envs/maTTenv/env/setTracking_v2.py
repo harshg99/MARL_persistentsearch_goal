@@ -63,9 +63,6 @@ class setTrackingEnv2(maTrackingBase):
         self.limit['state'] = [np.array(([0.0, 0.0, 0.0, -np.pi, -rel_vel_limit, -10*np.pi, -50.0, 0.0])),
                                np.array(([1.0, 1.0, 600.0, np.pi, rel_vel_limit, 10*np.pi, 50.0, 2.0]))]
 
-        self.limit['state'] = [np.array(([0.0, 0.0, -np.pi, 0.0, -np.pi, 0.0,       -np.pi, -rel_vel_limit, -10*np.pi, -50.0, 0.0])),
-                               np.array(([1.0, 1.0,  np.pi, 2.0,  np.pi, np.sqrt(2), np.pi,  rel_vel_limit,  10*np.pi,  50.0, 2.0]))]
-
         # TODO: based on Map bounds
         #self.cov_limit = (self.MAP.mapmax[0]-self.MAP.mapmin[0])*(self.MAP.mapmax[1]-self.MAP.mapmin[1])
         self.cov_limit = None
