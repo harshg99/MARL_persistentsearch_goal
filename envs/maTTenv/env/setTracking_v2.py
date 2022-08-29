@@ -340,7 +340,6 @@ class setTrackingEnv2(maTrackingBase):
             self.draw_circle(grid, agent.state[0], agent.state[1], METADATA['sensor_r'])
         
         coverage_reward_factor = (torch.sum(grid)/np.prod(self.MAP.mapmax)).item()
-        #print(f"Agent coverage ratio: {coverage_reward_factor}")
 
         reward_dict = []
         if self.reward_type=="Max":
