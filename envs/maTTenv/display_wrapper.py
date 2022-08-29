@@ -70,6 +70,33 @@ class Display2D(Wrapper):
                 figure = self.figs[i]
                 figure.clf()
                 new_plot = figure.add_subplot(111)
+                
+                target_colors = list(mcolors.TABLEAU_COLORS.values())
+                for jj in range(num_targets):
+                    new_plot.plot(self.traj_y[jj][0], self.traj_y[jj][1], 'r.', markersize=2)
+                    new_plot.plot(target_true_pos[jj][0], target_true_pos[jj][1], marker='o', markersize=5, 
+                        linestyle='None', markerfacecolor='r', markeredgecolor='r')
+                    # target velocities
+                    new_plot.text(self.mapmax[0]+1., self.mapmax[1]-5*num_agents-5*jj, f"v-target-{jj}:{np.sqrt(np.sum(self.env_core.targets[jj].state[2:]**2)):.2f}") # 'v_target:%.2f'%))
+
+                    # Belief on target
+                    new_plot.plot(target_b_state[i][jj][0], target_b_state[i][jj][1], marker='o', markersize=10, 
+                        linewidth=5 , markerfacecolor='none', markeredgecolor=target_colors[jj % len(target_colors)])
+                    
+                    eig_val, eig_vec = LA.eig(target_cov[i][jj][:2,:2])
+                    belief_target = patches.Ellipse((target_b_state[i][jj][0], target_b_state[i][jj][1]), 
+                                2*np.sqrt(eig_val[0])*self.c_cf, 2*np.sqrt(eig_val[1])*self.c_cf, 
+                                angle = 180/np.pi*np.arctan2(eig_vec[0][1],eig_vec[0][0]) ,fill=True,
+                                zorder=2, facecolor=target_colors[jj % len(target_colors)], alpha=0.5)
+                    new_plot.add_patch(belief_target)
+                    self.traj_y[jj][0].append(target_true_pos[jj][0])
+                    self.traj_y[jj][1].append(target_true_pos[jj][1])
+                    new_plot.set_xlim((self.mapmin[0], self.mapmax[0]))
+                    new_plot.set_ylim((self.mapmin[1], self.mapmax[1]))
+                    new_plot.set_aspect('equal','box')
+                    new_plot.grid()
+                    new_plot.set_title(' '.join([f'Agent # {i} Belief', mode.upper(),': Trajectory',str(traj_num)]))
+                
                 for ii in range(num_agents):
                     #agents positions
                     if i == ii:
@@ -95,33 +122,12 @@ class Display2D(Wrapper):
                     new_plot.add_patch(comm_arc)
                     self.traj[ii][0].append(agent_pos[ii][0])
                     self.traj[ii][1].append(agent_pos[ii][1])
-                target_colors = list(mcolors.TABLEAU_COLORS.values())
-                for jj in range(num_targets):
-                    new_plot.plot(self.traj_y[jj][0], self.traj_y[jj][1], 'r.', markersize=2)
-                    new_plot.plot(target_true_pos[jj][0], target_true_pos[jj][1], marker='o', markersize=5, 
-                        linestyle='None', markerfacecolor='r', markeredgecolor='r')
-                    # target velocities
-                    new_plot.text(self.mapmax[0]+1., self.mapmax[1]-5*num_agents-5*jj, f"v-target-{jj}:{np.sqrt(np.sum(self.env_core.targets[jj].state[2:]**2)):.2f}") # 'v_target:%.2f'%))
-
-                    # Belief on target
-                    new_plot.plot(target_b_state[i][jj][0], target_b_state[i][jj][1], marker='o', markersize=10, 
-                        linewidth=5 , markerfacecolor='none', markeredgecolor=target_colors[jj % len(target_colors)])
-                    
-                    eig_val, eig_vec = LA.eig(target_cov[i][jj][:2,:2])
-                    belief_target = patches.Ellipse((target_b_state[i][jj][0], target_b_state[i][jj][1]), 
-                                2*np.sqrt(eig_val[0])*self.c_cf, 2*np.sqrt(eig_val[1])*self.c_cf, 
-                                angle = 180/np.pi*np.arctan2(eig_vec[0][1],eig_vec[0][0]) ,fill=True,
-                                zorder=2, facecolor=target_colors[jj % len(target_colors)], alpha=0.5)
-                    new_plot.add_patch(belief_target)
-                    self.traj_y[jj][0].append(target_true_pos[jj][0])
-                    self.traj_y[jj][1].append(target_true_pos[jj][1])
-                    
-                    new_plot.set_xlim((self.mapmin[0], self.mapmax[0]))
-                    new_plot.set_ylim((self.mapmin[1], self.mapmax[1]))
-                    new_plot.set_aspect('equal','box')
-                    new_plot.grid()
-                    new_plot.set_title(' '.join([f'Agent # {i} Belief', mode.upper(),': Trajectory',str(traj_num)]))
-
+            
+            #from IPython import embed; embed()
+            #figure = self.figs[-1]
+            #figure.clf()
+            #new_plot = figure.add_subplot(111)
+            #new_plot.plot(self.env_core.grid) # how to plot a grid   
             if not record :
                 plt.draw()
                 plt.pause(0.0005)
