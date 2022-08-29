@@ -305,6 +305,24 @@ class setTrackingEnv2(maTrackingBase):
         return sum(max_uncertainity)
 
 
+    def draw_circle(self, grid, x0, y0, radius):
+        x0 = math.ceil(x0)
+        y0 = math.ceil(y0)
+        radius = int(radius)
+        for y in range(-radius, radius): # (y = -radius; y <= radius; y++)
+            for x in range(-radius, radius): # for (x = -radius; x <= radius; x++)
+                #print(x0, x, y0, y)
+                if ((x ** 2) + (y ** 2) <= (radius ** 2)) and x >= self.MAP.mapmin[0] and x < self.MAP.mapmax[0] and y >= self.MAP.mapmin[1] and y < self.MAP.mapmax[1]:
+                    if x0 + x - 1 < self.MAP.mapmax[0] and y0 + y - 1 < self.MAP.mapmax[1]:
+                        grid[x0 + x - 1, y0 + y - 1] = 1
+                    if x0 - x - 1 >= self.MAP.mapmin[0] and y0 - y - 1 >= self.MAP.mapmin[1]:
+                        grid[x0 - x - 1, y0 - y - 1] = 1
+                    if x0 + x - 1 < self.MAP.mapmax[0] and y0 - y - 1 >= self.MAP.mapmin[1]:
+                        grid[x0 + x - 1, y0 - y - 1] = 1
+                    if x0 - x - 1 >= self.MAP.mapmin[0] and y0 + y - 1 < self.MAP.mapmax[1]:
+                        grid[x0 - x - 1, y0 + y - 1] = 1
+
+    
     def reward_fun(self, agents, nb_targets, belief_targets, is_training=True, c_mean=0.1,scaled = False):
         #TODO: reward should be per agent
         globaldetcov = [LA.det(b_target.cov) for b_target in belief_targets]
@@ -315,31 +333,14 @@ class setTrackingEnv2(maTrackingBase):
         r_detcov_sum = - np.sum(np.log(globaldetcov))
         reward = c_mean * r_detcov_sum
 
-        def draw_circle(x0, y0, radius):
-            x0 = math.ceil(x0)
-            y0 = math.ceil(y0)
-            radius = int(radius)
-            for y in range(-radius, radius): # (y = -radius; y <= radius; y++)
-                for x in range(-radius, radius): # for (x = -radius; x <= radius; x++)
-                    if ((x ** 2) + (y ** 2) <= (radius ** 2)) and x >= self.MAP.mapmin[0] and x < self.MAP.mapmax[0] and y >= self.MAP.mapmin[1] and y < self.MAP.mapmax[1]:
-                        if x0 + x < self.MAP.mapmax[0] and y0 + y < self.MAP.mapmax[1]:
-                            grid[x0 + x, y0 + y] = 1
-                        if x0 - x > self.MAP.mapmin[0] and y0 - y >= self.MAP.mapmin[1]:
-                            grid[x0 - x, y0 - y] = 1
-                        if x0 + x < self.MAP.mapmax[0] and y0 - y >= self.MAP.mapmin[1]:
-                            grid[x0 + x, y0 - y] = 1
-                        if x0 - x > self.MAP.mapmin[0] and y0 + y < self.MAP.mapmax[1]:
-                            grid[x0 - x, y0 + y] = 1
-
-        
         ## discretize grid
         grid = torch.zeros(self.MAP.mapmax[0], self.MAP.mapmax[1])
         ## find occupied cells by all agent's sensor radius
         for agent in self.agents:
-            draw_circle(agent.state[0], agent.state[1], METADATA['sensor_r'])
+            self.draw_circle(grid, agent.state[0], agent.state[1], METADATA['sensor_r'])
         
         coverage_reward_factor = (torch.sum(grid)/np.prod(self.MAP.mapmax)).item()
-        print(f"Agent coverage ratio: {coverage_reward_factor}")
+        #print(f"Agent coverage ratio: {coverage_reward_factor}")
 
         reward_dict = []
         if self.reward_type=="Max":
@@ -347,13 +348,13 @@ class setTrackingEnv2(maTrackingBase):
                 detcov = [LA.det(b.cov) for b in agent.belief]
                 detcov = np.ravel(detcov)
                 detcov_max = - np.log(np.max(detcov))
-                reward_dict.append(c_mean*detcov_max)
+                reward_dict.append(coverage_reward_factor*c_mean*detcov_max)
         elif self.reward_type=="Mean":
             for id,agent in enumerate(self.agents):
                 detcov = [LA.det(b.cov) for b in agent.belief]
                 detcov = np.ravel(detcov)
                 detcov_max = - np.log(detcov).mean()
-                reward_dict.append(c_mean*detcov_max)
+                reward_dict.append(coverage_reward_factor*c_mean*detcov_max)
         
         if scaled:
             for agent_index in range(len(reward_dict)):
