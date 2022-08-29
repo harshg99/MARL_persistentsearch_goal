@@ -276,7 +276,6 @@ class setTrackingEnv2(maTrackingBase):
     def calculate_total_uncertainity(self):
         """
         Calculating metric
-
         - sum(tr(cov) over all beliefs)
         
         """
@@ -284,21 +283,20 @@ class setTrackingEnv2(maTrackingBase):
 
 
         for agent in self.agents:
-            total_uncertainity += sum([np.trace(b_target.cov) for b_target in agent.belief])
+            total_uncertainity += sum([np.sum(np.diag(b_target.cov)[:2]) for b_target in agent.belief])
         
         return total_uncertainity
 
     def calculate_max_uncertainity(self):
         """
         Calculating metric
-
         - sum(max(tr(cov)) over targets)
         
         """
         max_uncertainity = [0 for _ in range(self.nb_targets)]
         for agent in self.agents:
             for i, b_target in enumerate(agent.belief):
-                uncertainity = np.trace(b_target.cov)
+                uncertainity = np.sum(np.diag(b_target.cov)[:2])
                 if max_uncertainity[i] < uncertainity:
                     max_uncertainity[i] = uncertainity
                 
