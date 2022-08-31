@@ -41,7 +41,7 @@ class setTrackingEnv2(maTrackingBase):
                         is_training=True, known_noise=True, **kwargs):
         super().__init__(num_agents=num_agents, num_targets=num_targets,
                         map_name=map_name, is_training=is_training)
-
+        self.steps = 0
         self.id = 'setTracking-v2'
         self.metadata = self.id
         self.scaled = kwargs["scaled"]
@@ -78,7 +78,7 @@ class setTrackingEnv2(maTrackingBase):
             self.target_true_noise_sd = METADATA['const_q_true'] * np.concatenate((
                         np.concatenate((self.sampling_period**2/2*np.eye(2), self.sampling_period/2*np.eye(2)), axis=1),
                         np.concatenate((self.sampling_period/2*np.eye(2), self.sampling_period*np.eye(2)),axis=1) ))
-        
+        self.coverage_reward_factor = None
         # Build a robot 
         self.setup_agents()
         # Build a target
@@ -269,7 +269,7 @@ class setTrackingEnv2(maTrackingBase):
 
         info_dict['reward_all'] = reward_dict
         info_dict['metrics'] = [self.calculate_total_uncertainity(), self.calculate_max_uncertainity()]
-
+        self.steps += 1
         return obs_dict, reward, done, info_dict
 
 
@@ -336,22 +336,26 @@ class setTrackingEnv2(maTrackingBase):
         ## find occupied cells by all agent's sensor radius
         for agent in self.agents:
             self.draw_circle(grid, agent.state[0], agent.state[1], METADATA['sensor_r'])
+        sensor_footprint = torch.sum(grid)/np.prod(self.MAP.mapmax)
+        #import pdb; pdb.set_trace()
+        if not self.coverage_reward_factor:
+            self.coverage_reward_factor = sensor_footprint
+        else:
+            self.coverage_reward_factor = torch.sum(self.coverage_reward_factor)/np.prod(self.MAP.mapmax) * torch.exp(torch.Tensor([-(self.num_agents * self.steps)/100])) + sensor_footprint
         
-        coverage_reward_factor = (torch.sum(grid)/np.prod(self.MAP.mapmax)).item()
-
         reward_dict = []
         if self.reward_type=="Max":
             for id,agent in enumerate(self.agents):
                 detcov = [LA.det(b.cov) for b in agent.belief]
                 detcov = np.ravel(detcov)
                 detcov_max = - np.log(np.max(detcov))
-                reward_dict.append(coverage_reward_factor*c_mean*detcov_max)
+                reward_dict.append(self.coverage_reward_factor.item()*c_mean*detcov_max)
         elif self.reward_type=="Mean":
             for id,agent in enumerate(self.agents):
                 detcov = [LA.det(b.cov) for b in agent.belief]
                 detcov = np.ravel(detcov)
                 detcov_max = - np.log(detcov).mean()
-                reward_dict.append(coverage_reward_factor*c_mean*detcov_max)
+                reward_dict.append(self.coverage_reward_factor.item()*c_mean*detcov_max)
         
         if scaled:
             for agent_index in range(len(reward_dict)):
