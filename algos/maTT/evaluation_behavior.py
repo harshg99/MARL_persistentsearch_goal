@@ -20,7 +20,7 @@ def load_pytorch_policy(fpath, fname, model, deterministic=True):
     fname = osp.join(fpath,'state_dict/',fname)
     map_location = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
     model.load_state_dict(torch.load(fname, map_location))
-
+    model = model.to(map_location)
     # make function for producing an action given a single state
     def get_action(x, deterministic=True):
         with torch.no_grad():
