@@ -11,6 +11,7 @@ from envs.maTTenv.belief_tracker import KFbelief
 from envs.maTTenv.metadata import METADATA
 from envs.maTTenv.env.maTracking_Base import maTrackingBase
 from copy import deepcopy
+from tryalgo import union_rectangles
 """
 Target Tracking Environments for Reinforcement Learning.
 [Variables]
@@ -332,23 +333,36 @@ class setTrackingEnv2(maTrackingBase):
         reward = c_mean * r_detcov_sum
 
         ## discretize grid
-        grid = torch.zeros(self.MAP.mapmax[0], self.MAP.mapmax[1])
+        #grid = torch.zeros(self.MAP.mapmax[0], self.MAP.mapmax[1])
         ## find occupied cells by all agent's sensor radius
+        square_side_divided_by_2 = METADATA['sensor_r']/2 * np.sqrt(np.pi)
+        rectangles = []
         for agent in self.agents:
-            self.draw_circle(grid, agent.state[0], agent.state[1], METADATA['sensor_r'])
-        sensor_footprint = torch.sum(grid)/np.prod(self.MAP.mapmax)
+            #import pdb; pdb.set_trace()
+            x, y = agent.state[0], agent.state[1]
+            # TODO: https://colab.research.google.com/drive/15LiJpRjjNOGBWzlJUNAu8e5RpWIUa2SV?usp=sharing
+            rectangles.append([x - square_side_divided_by_2, y - square_side_divided_by_2, x + square_side_divided_by_2, y + square_side_divided_by_2])
+            #self.draw_circle(grid, agent.state[0], agent.state[1], METADATA['sensor_r'])
+        sensor_footprint = union_rectangles(rectangles)
+
         #import pdb; pdb.set_trace()
         if not self.coverage_reward_factor:
             self.coverage_reward_factor = sensor_footprint
         else:
-            self.coverage_reward_factor = torch.sum(self.coverage_reward_factor)/np.prod(self.MAP.mapmax) * torch.exp(torch.Tensor([-(self.num_agents * self.steps)/100])) + sensor_footprint
+            # TODO: coverage shouldnt be dependent on number of agents; decay; how to pick number of steps to decay? size of the
+            self.coverage_reward_factor = self.coverage_reward_factor/np.prod(self.MAP.mapmax) * torch.exp(torch.Tensor([-(self.steps)/50])) + sensor_footprint
         
         reward_dict = []
         if self.reward_type=="Max":
             for id,agent in enumerate(self.agents):
                 detcov = [LA.det(b.cov) for b in agent.belief]
                 detcov = np.ravel(detcov)
-                detcov_max = - np.log(np.max(detcov))
+                if is_training:
+                    detcov_max = - np.log(np.max(globaldetcov))
+                    #print("centralized")
+                else:
+                    detcov_max = - np.log(np.max(detcov))
+                    #print("individual")
                 reward_dict.append(self.coverage_reward_factor.item()*c_mean*detcov_max)
         elif self.reward_type=="Mean":
             for id,agent in enumerate(self.agents):

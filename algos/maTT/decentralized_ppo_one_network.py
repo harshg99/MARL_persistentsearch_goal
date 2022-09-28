@@ -150,8 +150,8 @@ def decentralized_ppo(envs, model, args, run_name, notes=None):
                 for env_i in range(args.num_envs):
                     print(f"global_step={global_step}, episodic_return_env={env_i}={torch.sum(rewards[step - ep_length:step, env_i]).item()}")
                     writer.add_scalar(f"charts/episodic_return_env_{env_i}", torch.sum(rewards[step - ep_length:step, env_i]).item(), global_step)
-                    writer.add_scalar(f"evaluation_total_uncertainity_env_{env_i}", torch.sum(rewards[step - ep_length:step, env_i, 0]).item(), global_step)
-                    writer.add_scalar(f"evaluation_max_uncertainity_env_{env_i}", torch.sum(rewards[step - ep_length:step, env_i, 1]).item(), global_step)
+                    writer.add_scalar(f"evaluation_total_uncertainity_env_{env_i}", torch.sum(metrics[step - ep_length:step, env_i, 0]).item(), global_step)
+                    writer.add_scalar(f"evaluation_max_uncertainity_env_{env_i}", torch.sum(metrics[step - ep_length:step, env_i, 1]).item(), global_step)
                     
                 writer.add_scalar("charts/episodic_length", ep_length, global_step)
                 
@@ -159,7 +159,6 @@ def decentralized_ppo(envs, model, args, run_name, notes=None):
                 envs.reset()
                 break
             ep_length += 1
-        
         # bootstrap value if not done
         advantages = torch.zeros((args.num_steps, args.num_envs, args.nb_agents)).to(device)
         returns = torch.zeros((args.num_steps, args.num_envs, args.nb_agents)).to(device)

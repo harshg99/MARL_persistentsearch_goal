@@ -78,7 +78,7 @@ METADATA_v4 = {
         'sensor_r_sd': 0.2, # sensor range noise.
         'sensor_b_sd': 0.01, # sensor bearing noise.
         'target_init_cov': 30.0, # initial target diagonal Covariance.
-        'target_init_vel': 0.0, # target's initial velocity.
+        'target_init_vel': 0.5, # target's initial velocity.
         'target_vel_limit': 2.0, # velocity limit of targets.
         'init_distance_min': 10.0, # the minimum distance btw targets and the agent.
         'init_distance_max': 20.0, # the maximum distance btw targets and the agent.

@@ -7,7 +7,7 @@ from numpy import linalg as LA
 
 import pdb, os
 import matplotlib
-matplotlib.use('Agg')
+matplotlib.use('TkAgg')
 from matplotlib import pyplot as plt
 from matplotlib import patches
 from matplotlib import animation
@@ -73,11 +73,11 @@ class Display2D(Wrapper):
                 
                 target_colors = list(mcolors.TABLEAU_COLORS.values())
                 for jj in range(num_targets):
-                    if len(self.traj[jj][0]) > 20:
-                        new_plot.plot(self.traj_y[jj][0][-20:], self.traj_y[jj][1][-20:], 'r.', markersize=2)
-                    else:
-                        new_plot.plot(self.traj_y[jj][0], self.traj_y[jj][1], 'r.', markersize=2)
-                    
+                    #if len(self.traj[jj][0]) > 20:
+                    #    new_plot.plot(self.traj_y[jj][0][-20:], self.traj_y[jj][1][-20:], 'r.', markersize=2)
+                    #else:
+                    #    new_plot.plot(self.traj_y[jj][0], self.traj_y[jj][1], 'r.', markersize=2)
+                    new_plot.plot(self.traj_y[jj][0], self.traj_y[jj][1], 'r.', markersize=2)
                     new_plot.plot(target_true_pos[jj][0], target_true_pos[jj][1], marker='o', markersize=5, 
                         linestyle='None', markerfacecolor='r', markeredgecolor='r')
                     # target velocities
