@@ -7,7 +7,7 @@ from numpy import linalg as LA
 
 import pdb, os
 import matplotlib
-matplotlib.use('Agg')
+matplotlib.use('TkAgg')
 from matplotlib import pyplot as plt
 from matplotlib import patches
 from matplotlib import animation
@@ -70,33 +70,13 @@ class Display2D(Wrapper):
                 figure = self.figs[i]
                 figure.clf()
                 new_plot = figure.add_subplot(111)
-                for ii in range(num_agents):
-                    #agents positions
-                    if i == ii:
-                        new_plot.plot(agent_pos[ii][0], agent_pos[ii][1], marker=(3, 0, agent_pos[ii][2]/np.pi*180-90),
-                        markersize=10, linestyle='None', markerfacecolor='m', markeredgecolor='m')
-                    else:
-                        new_plot.plot(agent_pos[ii][0], agent_pos[ii][1], marker=(3, 0, agent_pos[ii][2]/np.pi*180-90),
-                        markersize=10, linestyle='None', markerfacecolor='b', markeredgecolor='b')
-                    new_plot.plot(self.traj[ii][0], self.traj[ii][1], 'b.', markersize=2)
-                    #agents velocities on legends
-                    new_plot.text(self.mapmax[0]+1., self.mapmax[1]-5*ii, f"v-agent-{ii}:{self.env_core.agents[ii].vw[0]}")
-                    #agents sensor indicators
-                    sensor_arc = patches.Arc((agent_pos[ii][0], agent_pos[ii][1]), METADATA['sensor_r']*2, METADATA['sensor_r']*2, 
-                        angle = agent_pos[ii][2]/np.pi*180, theta1 = -METADATA['fov']/2, theta2 = METADATA['fov']/2, facecolor='gray')
-                    new_plot.add_patch(sensor_arc)
-                    new_plot.plot([agent_pos[ii][0], agent_pos[ii][0]+METADATA['sensor_r']*np.cos(agent_pos[ii][2]+0.5*METADATA['fov']/180.0*np.pi)],
-                        [agent_pos[ii][1], agent_pos[ii][1]+METADATA['sensor_r']*np.sin(agent_pos[ii][2]+0.5*METADATA['fov']/180.0*np.pi)],'k', linewidth=0.5)
-                    new_plot.plot([agent_pos[ii][0], agent_pos[ii][0]+METADATA['sensor_r']*np.cos(agent_pos[ii][2]-0.5*METADATA['fov']/180.0*np.pi)],
-                        [agent_pos[ii][1], agent_pos[ii][1]+METADATA['sensor_r']*np.sin(agent_pos[ii][2]-0.5*METADATA['fov']/180.0*np.pi)],'k', linewidth=0.5)
-                    # agents communication range
-                    comm_arc = patches.Arc((agent_pos[ii][0], agent_pos[ii][1]), METADATA['comms_r']*2, METADATA['comms_r']*2, 
-                        angle = agent_pos[ii][2]/np.pi*180, theta1 = -180, theta2 = 180, edgecolor='orange', facecolor='orange')
-                    new_plot.add_patch(comm_arc)
-                    self.traj[ii][0].append(agent_pos[ii][0])
-                    self.traj[ii][1].append(agent_pos[ii][1])
+                
                 target_colors = list(mcolors.TABLEAU_COLORS.values())
                 for jj in range(num_targets):
+                    #if len(self.traj[jj][0]) > 20:
+                    #    new_plot.plot(self.traj_y[jj][0][-20:], self.traj_y[jj][1][-20:], 'r.', markersize=2)
+                    #else:
+                    #    new_plot.plot(self.traj_y[jj][0], self.traj_y[jj][1], 'r.', markersize=2)
                     new_plot.plot(self.traj_y[jj][0], self.traj_y[jj][1], 'r.', markersize=2)
                     new_plot.plot(target_true_pos[jj][0], target_true_pos[jj][1], marker='o', markersize=5, 
                         linestyle='None', markerfacecolor='r', markeredgecolor='r')
@@ -115,13 +95,46 @@ class Display2D(Wrapper):
                     new_plot.add_patch(belief_target)
                     self.traj_y[jj][0].append(target_true_pos[jj][0])
                     self.traj_y[jj][1].append(target_true_pos[jj][1])
-                    
                     new_plot.set_xlim((self.mapmin[0], self.mapmax[0]))
                     new_plot.set_ylim((self.mapmin[1], self.mapmax[1]))
                     new_plot.set_aspect('equal','box')
                     new_plot.grid()
                     new_plot.set_title(' '.join([f'Agent # {i} Belief', mode.upper(),': Trajectory',str(traj_num)]))
-
+                
+                for ii in range(num_agents):
+                    #agents positions
+                    if i == ii:
+                        new_plot.plot(agent_pos[ii][0], agent_pos[ii][1], marker=(3, 0, agent_pos[ii][2]/np.pi*180-90),
+                        markersize=10, linestyle='None', markerfacecolor='m', markeredgecolor='m')
+                    else:
+                        new_plot.plot(agent_pos[ii][0], agent_pos[ii][1], marker=(3, 0, agent_pos[ii][2]/np.pi*180-90),
+                        markersize=10, linestyle='None', markerfacecolor='b', markeredgecolor='b')
+                    if len(self.traj[ii][0]) > 20:
+                        new_plot.plot(self.traj[ii][0][-20:], self.traj[ii][1][-20:], 'b.', markersize=2)
+                    else:
+                        new_plot.plot(self.traj[ii][0], self.traj[ii][1], 'b.', markersize=2)
+                    #agents velocities on legends
+                    new_plot.text(self.mapmax[0]+1., self.mapmax[1]-5*ii, f"v-agent-{ii}:{self.env_core.agents[ii].vw[0]}")
+                    #agents sensor indicators
+                    sensor_arc = patches.Arc((agent_pos[ii][0], agent_pos[ii][1]), METADATA['sensor_r']*2, METADATA['sensor_r']*2, 
+                        angle = agent_pos[ii][2]/np.pi*180, theta1 = -METADATA['fov']/2, theta2 = METADATA['fov']/2, facecolor='gray')
+                    new_plot.add_patch(sensor_arc)
+                    new_plot.plot([agent_pos[ii][0], agent_pos[ii][0]+METADATA['sensor_r']*np.cos(agent_pos[ii][2]+0.5*METADATA['fov']/180.0*np.pi)],
+                        [agent_pos[ii][1], agent_pos[ii][1]+METADATA['sensor_r']*np.sin(agent_pos[ii][2]+0.5*METADATA['fov']/180.0*np.pi)],'k', linewidth=0.5)
+                    new_plot.plot([agent_pos[ii][0], agent_pos[ii][0]+METADATA['sensor_r']*np.cos(agent_pos[ii][2]-0.5*METADATA['fov']/180.0*np.pi)],
+                        [agent_pos[ii][1], agent_pos[ii][1]+METADATA['sensor_r']*np.sin(agent_pos[ii][2]-0.5*METADATA['fov']/180.0*np.pi)],'k', linewidth=0.5)
+                    # agents communication range
+                    comm_arc = patches.Arc((agent_pos[ii][0], agent_pos[ii][1]), METADATA['comms_r']*2, METADATA['comms_r']*2, 
+                        angle = agent_pos[ii][2]/np.pi*180, theta1 = -180, theta2 = 180, edgecolor='orange', facecolor='orange')
+                    new_plot.add_patch(comm_arc)
+                    """if len(self.traj[ii][0]) > 5:
+                        self.traj[ii][0].pop(0)
+                        self.traj[ii][1].pop(0)
+                        self.traj[ii][0].append(agent_pos[ii][0])
+                        self.traj[ii][1].append(agent_pos[ii][1])
+                    else:"""
+                    self.traj[ii][0].append(agent_pos[ii][0])
+                    self.traj[ii][1].append(agent_pos[ii][1]) 
             if not record :
                 plt.draw()
                 plt.pause(0.0005)

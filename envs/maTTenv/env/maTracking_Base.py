@@ -36,7 +36,6 @@ class maTrackingBase(gym.Env):
         self.sensor_b_sd = METADATA['sensor_b_sd']
         self.sensor_r = METADATA['sensor_r']
         self.fov = METADATA['fov']
-        self.T_MAX_STEPS = kwargs['T_MAX_STEPS']
         map_dir_path = '/'.join(map_utils.__file__.split('/')[:-1])
         self.MAP = map_utils.GridMap(
             map_path=os.path.join(map_dir_path, map_name), 
@@ -119,10 +118,13 @@ class maTrackingBase(gym.Env):
             max_ang_dist += 2*np.pi
         rand_ang = util.wrap_around(np.random.rand() * \
                         (max_ang_dist - min_ang_dist) + min_ang_dist + c_theta)
-
         rand_r = np.random.rand() * (max_lin_dist - min_lin_dist) + min_lin_dist
-        rand_xy = np.array([rand_r*np.cos(rand_ang), rand_r*np.sin(rand_ang)]) + o_xy
+        rand_xy = np.array([rand_r * np.cos(rand_ang), rand_r * np.sin(rand_ang)]) + o_xy
         is_valid = not(map_utils.is_collision(self.MAP, rand_xy))
+        if not is_valid:
+            print(f"Pose is not valid. Generating new pose. {rand_xy}")
+        else:
+            print(f"Found valid pose. {rand_xy}")
         return is_valid, [rand_xy[0], rand_xy[1], rand_ang]
 
     def get_init_pose(self, init_pose_list=[], **kwargs):

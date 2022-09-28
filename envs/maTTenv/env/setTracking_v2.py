@@ -1,6 +1,5 @@
 import os, copy, pdb
-
-import gym.spaces
+import math
 import numpy as np
 from numpy import linalg as LA
 import torch
@@ -12,6 +11,7 @@ from envs.maTTenv.belief_tracker import KFbelief
 from envs.maTTenv.metadata import METADATA
 from envs.maTTenv.env.maTracking_Base import maTrackingBase
 from copy import deepcopy
+from tryalgo import union_rectangles
 """
 Target Tracking Environments for Reinforcement Learning.
 [Variables]
@@ -41,8 +41,8 @@ class setTrackingEnv2(maTrackingBase):
     def __init__(self, num_agents=1, num_targets=2, map_name='empty', 
                         is_training=True, known_noise=True, **kwargs):
         super().__init__(num_agents=num_agents, num_targets=num_targets,
-                        map_name=map_name, is_training=is_training,**kwargs)
-
+                        map_name=map_name, is_training=is_training)
+        self.steps = 0
         self.id = 'setTracking-v2'
         self.metadata = self.id
         self.scaled = kwargs["scaled"]
@@ -52,49 +52,34 @@ class setTrackingEnv2(maTrackingBase):
         self.agent_dim = 3
         self.target_dim = 4
         self.target_init_vel = METADATA['target_init_vel']*np.ones((2,))
-        self.num_agent_rendz_hist = METADATA['agent_rendz_hist']
         # LIMIT
         self.limit = {} # 0: low, 1:highs
         self.limit['agent'] = [np.concatenate((self.MAP.mapmin,[-np.pi])), np.concatenate((self.MAP.mapmax, [np.pi]))]
         self.limit['target'] = [np.concatenate((self.MAP.mapmin,[-METADATA['target_vel_limit'], -METADATA['target_vel_limit']])),
                                 np.concatenate((self.MAP.mapmax, [METADATA['target_vel_limit'], METADATA['target_vel_limit']]))]
-
         rel_vel_limit = METADATA['target_vel_limit'] + METADATA['action_v'][0] # Maximum relative speed
+
+        # normalize
         self.limit['state'] = [np.array(([0.0, 0.0, 0.0, -np.pi, -rel_vel_limit, -10*np.pi, -50.0, 0.0])),
                                np.array(([1.0, 1.0, 600.0, np.pi, rel_vel_limit, 10*np.pi, 50.0, 2.0]))]
 
-        # TODO: based on Map bounds
-        #self.cov_limit = (self.MAP.mapmax[0]-self.MAP.mapmin[0])*(self.MAP.mapmax[1]-self.MAP.mapmin[1])
-        self.cov_limit = None
-
-        agent_observation_space = gym.spaces.Box(np.tile(np.array([-1.0,0.0,0.0,-1.0]),(self.num_agent_rendz_hist,1)),
-                                                 np.tile(np.array([1.0,1.0,1.0,1.0]),(self.num_agent_rendz_hist,1)))
         self.communication_range = METADATA['comms_r']
 
-        target_observation_space = spaces.Box(np.tile(self.limit['state'][0], (self.num_targets, 1)),
-                                              np.tile(self.limit['state'][1], (self.num_targets, 1)), dtype=np.float32)
-
-        observation_space = gym.spaces.Dict({'target':target_observation_space,'agent':agent_observation_space})
-
-        self.full_observation_space = {f"agent-{i}": observation_space for i in
-                                  range(self.nb_agents)}
-        self.observation_space = self.pack_observation_space({f"agent-{i}":observation_space for i in range(self.nb_agents)})
+        observation_space = spaces.Box(np.tile(self.limit['state'][0], (self.num_targets, 1)), np.tile(self.limit['state'][1], (self.num_targets, 1)), dtype=np.float32)
+        self.observation_space = {f"agent-{i}":observation_space for i in range(self.nb_agents)}
         self.observation_space = spaces.Dict(self.observation_space)
-
         self.targetA = np.concatenate((np.concatenate((np.eye(2), self.sampling_period*np.eye(2)), axis=1), 
                                        [[0,0,1,0],[0,0,0,1]]))
         self.target_noise_cov = METADATA['const_q'] * np.concatenate((
                         np.concatenate((self.sampling_period**3/3*np.eye(2), self.sampling_period**2/2*np.eye(2)), axis=1),
                         np.concatenate((self.sampling_period**2/2*np.eye(2), self.sampling_period*np.eye(2)),axis=1) ))
-
-
         if known_noise:
             self.target_true_noise_sd = self.target_noise_cov
         else:
             self.target_true_noise_sd = METADATA['const_q_true'] * np.concatenate((
                         np.concatenate((self.sampling_period**2/2*np.eye(2), self.sampling_period/2*np.eye(2)), axis=1),
                         np.concatenate((self.sampling_period/2*np.eye(2), self.sampling_period*np.eye(2)),axis=1) ))
-        
+        self.coverage_reward_factor = None
         # Build a robot 
         self.setup_agents()
         # Build a target
@@ -102,17 +87,6 @@ class setTrackingEnv2(maTrackingBase):
         self.setup_belief_targets()
         # Use custom reward
         #self.get_reward()
-
-    def pack_observation_space(self,obs_space):
-        pack_obs_space = {}
-        for agent in obs_space.keys():
-            total_size = 0
-            for attr in obs_space[agent].keys():
-                total_size += np.prod(obs_space[agent][attr].shape)
-            pack_obs_space[agent] = gym.spaces.Box(
-                    low=-2 ** 20, high=2 ** 20,
-                    shape=(int(total_size),))
-        return pack_obs_space
 
     def setup_agents(self):
         self.agents = [AgentSE2(agent_id = 'agent-' + str(i), 
@@ -133,9 +107,8 @@ class setTrackingEnv2(maTrackingBase):
         self.belief_targets = [KFbelief(agent_id = 'target-' + str(i),
                         dim=self.target_dim, limit=self.limit['target'], A=self.targetA,
                         W=self.target_noise_cov, obs_noise_func=self.observation_noise,
-                        collision_func=lambda x: map_utils.is_collision(self.MAP, x),
-                        CovLimit = self.cov_limit)
-                        for i in range(self.num_targets) ]
+                        collision_func=lambda x: map_utils.is_collision(self.MAP, x))
+                        for i in range(self.num_targets)]
         # Initialise individual target beliefs for each agent
 
         for agent in self.agents:
@@ -144,8 +117,7 @@ class setTrackingEnv2(maTrackingBase):
 
     def get_reward(self, observed=None, is_training=True):
         return self.reward_fun(self.agents, self.nb_targets,self.belief_targets,is_training,c_mean=0.1,scaled = self.scaled)
-
-
+    
     def reset(self,**kwargs):
         """
         Random initialization a number of agents and targets at the reset of the env epsiode.
@@ -197,21 +169,19 @@ class setTrackingEnv2(maTrackingBase):
             logdetcov = np.log(LA.det(self.agents[agentID].belief[jj].cov))
             if action_vw is None:
                 observed = 0.0
-                v = 0.0
-                w = 0.0
             else:
                 observed = float(isObserved[jj])
+
             observation.append([self.agents[agentID].state[0]/self.MAP.mapmax[0], self.agents[agentID].state[1]/self.MAP.mapmax[0], r, alpha, r_dot_b, alpha_dot_b, logdetcov, observed])
 
         return torch.tensor(observation,dtype=torch.float32)
-
-
+    
     def communicate_graph(self):
         '''
         Returns a dictionary of agents that are within communication range
         '''
         agent_comms_dict = {}
-        agent_info_comms_dict = {}
+
         for i, agent_i in enumerate(self.agents):
             for j, agent_j in enumerate(self.agents):
                 r, _ = util.relative_distance_polar(agent_j.state[:2],
@@ -221,16 +191,10 @@ class setTrackingEnv2(maTrackingBase):
                 if i != j and (r <= self.communication_range):
                     if agent_i.agent_id not in agent_comms_dict.keys():
                         agent_comms_dict[i] = [j]
-                        agent_info_comms_dict[i] ={}
-                        agent_info_comms_dict[i][j] = [agent_j.state[0]/self.MAP.mapmax[0],
-                                                       agent_j.state[1]/self.MAP.mapmax[1]]
                     else:
                         agent_comms_dict[i].append(j)
-                        agent_info_comms_dict[i][j] = [agent_j.state[0]/self.MAP.mapmax[0],
-                                                       agent_j.state[1]/self.MAP.mapmax[1]]
 
-
-        return agent_comms_dict,agent_info_comms_dict
+        return agent_comms_dict
 
     def step(self, action_dict):
         obs_dict = {}
@@ -251,13 +215,13 @@ class setTrackingEnv2(maTrackingBase):
         observed = np.zeros((self.nb_agents, self.nb_targets), dtype=bool)
 
         # Communication
-        agent_graph,agent_info_comms_dict = self.communicate_graph()
+        agent_graph = self.communicate_graph()
 
         update_comm_beliefs = []
 
         for id in agent_graph.keys():
             comm_recv_beliefs = [self.agents[ID].belief for ID in agent_graph[id]]
-            update_comm_beliefs.append(self.agents[id].updateCommBelief(comm_recv_beliefs,agent_info_comms_dict))
+            update_comm_beliefs.append(self.agents[id].updateCommBelief(comm_recv_beliefs))
 
         for agentid, updatedCommBelief in enumerate(update_comm_beliefs):
             self.agents[agentid].setupBelief(updatedCommBelief)
@@ -276,7 +240,6 @@ class setTrackingEnv2(maTrackingBase):
                 if agent_id != ids:
                     margin_pos.append(np.array(self.agents[p].state[:2]))
             _ = self.agents[ii].update(action_vw, margin_pos)
-            self.agents[ii].update_agent_rendz_history()
 
 
             # Update beliefs of targets
@@ -288,6 +251,10 @@ class setTrackingEnv2(maTrackingBase):
                     #Update agents indivuudla be,liefs based on observation
                     self.agents[ii].updateBelief(targetID=jj,z_t = z_t)
 
+
+                    # Update global belief
+                    # TODO: Gaurav says: how to update global belief_target
+                    #TODO: Global belief updates with all agent observations as usual
                     self.belief_targets[jj].update(z_t, self.agents[ii].state)
 
 
@@ -304,14 +271,13 @@ class setTrackingEnv2(maTrackingBase):
 
         info_dict['reward_all'] = reward_dict
         info_dict['metrics'] = [self.calculate_total_uncertainity(), self.calculate_max_uncertainity()]
-
+        self.steps += 1
         return obs_dict, reward, done, info_dict
 
 
     def calculate_total_uncertainity(self):
         """
         Calculating metric
-
         - sum(tr(cov) over all beliefs)
         
         """
@@ -319,27 +285,44 @@ class setTrackingEnv2(maTrackingBase):
 
 
         for agent in self.agents:
-            total_uncertainity += sum([np.trace(b_target.cov) for b_target in agent.belief])
+            total_uncertainity += sum([np.sum(np.diag(b_target.cov)[:2]) for b_target in agent.belief])
         
         return total_uncertainity
 
     def calculate_max_uncertainity(self):
         """
         Calculating metric
-
         - sum(max(tr(cov)) over targets)
         
         """
         max_uncertainity = [0 for _ in range(self.nb_targets)]
         for agent in self.agents:
             for i, b_target in enumerate(agent.belief):
-                uncertainity = np.trace(b_target.cov)
+                uncertainity = np.sum(np.diag(b_target.cov)[:2])
                 if max_uncertainity[i] < uncertainity:
                     max_uncertainity[i] = uncertainity
                 
         return sum(max_uncertainity)
 
 
+    def draw_circle(self, grid, x0, y0, radius):
+        x0 = math.ceil(x0)
+        y0 = math.ceil(y0)
+        radius = int(radius)
+        for y in range(-radius, radius): # (y = -radius; y <= radius; y++)
+            for x in range(-radius, radius): # for (x = -radius; x <= radius; x++)
+                #print(x0, x, y0, y)
+                if ((x ** 2) + (y ** 2) <= (radius ** 2)) and x >= self.MAP.mapmin[0] and x < self.MAP.mapmax[0] and y >= self.MAP.mapmin[1] and y < self.MAP.mapmax[1]:
+                    if x0 + x - 1 < self.MAP.mapmax[0] and y0 + y - 1 < self.MAP.mapmax[1]:
+                        grid[x0 + x - 1, y0 + y - 1] = 1
+                    if x0 - x - 1 >= self.MAP.mapmin[0] and y0 - y - 1 >= self.MAP.mapmin[1]:
+                        grid[x0 - x - 1, y0 - y - 1] = 1
+                    if x0 + x - 1 < self.MAP.mapmax[0] and y0 - y - 1 >= self.MAP.mapmin[1]:
+                        grid[x0 + x - 1, y0 - y - 1] = 1
+                    if x0 - x - 1 >= self.MAP.mapmin[0] and y0 + y - 1 < self.MAP.mapmax[1]:
+                        grid[x0 - x - 1, y0 + y - 1] = 1
+
+    
     def reward_fun(self, agents, nb_targets, belief_targets, is_training=True, c_mean=0.1,scaled = False):
         #TODO: reward should be per agent
         globaldetcov = [LA.det(b_target.cov) for b_target in belief_targets]
@@ -350,19 +333,44 @@ class setTrackingEnv2(maTrackingBase):
         r_detcov_sum = - np.sum(np.log(globaldetcov))
         reward = c_mean * r_detcov_sum
 
+        ## discretize grid
+        #grid = torch.zeros(self.MAP.mapmax[0], self.MAP.mapmax[1])
+        ## find occupied cells by all agent's sensor radius
+        square_side_divided_by_2 = METADATA['sensor_r']/2 * np.sqrt(np.pi)
+        rectangles = []
+        for agent in self.agents:
+            #import pdb; pdb.set_trace()
+            x, y = agent.state[0], agent.state[1]
+            # TODO: https://colab.research.google.com/drive/15LiJpRjjNOGBWzlJUNAu8e5RpWIUa2SV?usp=sharing
+            rectangles.append([x - square_side_divided_by_2, y - square_side_divided_by_2, x + square_side_divided_by_2, y + square_side_divided_by_2])
+            #self.draw_circle(grid, agent.state[0], agent.state[1], METADATA['sensor_r'])
+        sensor_footprint = union_rectangles(rectangles)
+
+        #import pdb; pdb.set_trace()
+        if not self.coverage_reward_factor:
+            self.coverage_reward_factor = sensor_footprint
+        else:
+            # TODO: coverage shouldnt be dependent on number of agents; decay; how to pick number of steps to decay? size of the
+            self.coverage_reward_factor = self.coverage_reward_factor/np.prod(self.MAP.mapmax) * torch.exp(torch.Tensor([-(self.steps)/50])) + sensor_footprint
+        
         reward_dict = []
         if self.reward_type=="Max":
             for id,agent in enumerate(self.agents):
                 detcov = [LA.det(b.cov) for b in agent.belief]
                 detcov = np.ravel(detcov)
-                detcov_max = - np.log(np.max(detcov))
-                reward_dict.append(c_mean*detcov_max)
+                if is_training:
+                    detcov_max = - np.log(np.max(globaldetcov))
+                    #print("centralized")
+                else:
+                    detcov_max = - np.log(np.max(detcov))
+                    #print("individual")
+                reward_dict.append(self.coverage_reward_factor.item()*c_mean*detcov_max)
         elif self.reward_type=="Mean":
             for id,agent in enumerate(self.agents):
                 detcov = [LA.det(b.cov) for b in agent.belief]
                 detcov = np.ravel(detcov)
                 detcov_max = - np.log(detcov).mean()
-                reward_dict.append(c_mean*detcov_max)
+                reward_dict.append(self.coverage_reward_factor.item()*c_mean*detcov_max)
         
         if scaled:
             for agent_index in range(len(reward_dict)):

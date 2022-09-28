@@ -122,10 +122,7 @@ def decentralized_ppo(envs, model, args, run_name):
             action_dict = [{} for _ in range(args.num_envs)]
             with torch.no_grad():
                 for i, agent_id in enumerate(agent_networks.keys()):
-                    if args.ppomodel == 'PPOAttention':
-                        action, logprob, _, value,attention_weights = agent_networks[agent_id].get_action_and_value(next_obs[agent_id])
-                    else:
-                        action, logprob, _, value = agent_networks[agent_id].get_action_and_value(next_obs[agent_id])
+                    action, logprob, _, value = agent_networks[agent_id].get_action_and_value(next_obs[agent_id])
                     for j in range(action.shape[0]):
                         action_dict[j][agent_id] = action[j].item()
                     actions[step, :, i] = action.to(device)
@@ -194,12 +191,7 @@ def decentralized_ppo(envs, model, args, run_name):
                     end = start + args.minibatch_size
                     mb_inds = b_inds[start:end]
                     # logprobs are being compared. make sure the log probs are referencing the same targets
-                    if args.ppomodel == 'PPOAtt':
-                        _, newlogprob, entropy, newvalue,_ = agent_networks[agent_id].get_action_and_value(b_obs[mb_inds], b_actions.long()[mb_inds])# b_obs[mb_inds] --> (64, num_targets, observation.dim)
-                    else:
-                        _, newlogprob, entropy, newvalue = agent_networks[agent_id].get_action_and_value(b_obs[mb_inds],
-                                                                                                         b_actions.long()[
-                                                                                                             mb_inds])
+                    _, newlogprob, entropy, newvalue = agent_networks[agent_id].get_action_and_value(b_obs[mb_inds], b_actions.long()[mb_inds]) # b_obs[mb_inds] --> (64, num_targets, observation.dim)
                     logratio = newlogprob - b_logprobs[mb_inds]
                     ratio = logratio.exp()
 
