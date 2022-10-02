@@ -1,5 +1,7 @@
 import os, copy, pdb
 import math
+import random
+
 import numpy as np
 from numpy import linalg as LA
 import torch
@@ -79,7 +81,8 @@ class setTrackingEnv2(maTrackingBase):
             self.target_true_noise_sd = METADATA['const_q_true'] * np.concatenate((
                         np.concatenate((self.sampling_period**2/2*np.eye(2), self.sampling_period/2*np.eye(2)), axis=1),
                         np.concatenate((self.sampling_period/2*np.eye(2), self.sampling_period*np.eye(2)),axis=1) ))
-        self.coverage_reward_factor = None
+        self.coverage_reward_factor = METADATA['coverage_reward']
+        self.global_coverage_map = np.zeros(shape=self.MAP.mapmax)
         # Build a robot 
         self.setup_agents()
         # Build a target
@@ -322,7 +325,18 @@ class setTrackingEnv2(maTrackingBase):
                     if x0 - x - 1 >= self.MAP.mapmin[0] and y0 + y - 1 < self.MAP.mapmax[1]:
                         grid[x0 - x - 1, y0 + y - 1] = 1
 
-    
+    def update_global_coverage_map(self, rectangle_map, decay):
+        if self.global_coverage_map is not None:
+            coverage_map2= deepcopy(self.global_coverage_map)
+            coverage_map2[rectangle_map] = 1.0
+            coverage_reward = np.sum(coverage_map2) - np.sum(self.global_coverage_map)
+            self.global_coverage_map = deepcopy(coverage_map2)
+        else:
+            self.global_coverage_map = deepcopy(rectangle_map.to(np.float))
+            coverage_reward = np.sum(self.coverage_map)
+
+        return coverage_reward
+
     def reward_fun(self, agents, nb_targets, belief_targets, is_training=True, c_mean=0.1,scaled = False):
         #TODO: reward should be per agent
         globaldetcov = [LA.det(b_target.cov) for b_target in belief_targets]
@@ -338,20 +352,42 @@ class setTrackingEnv2(maTrackingBase):
         ## find occupied cells by all agent's sensor radius
         square_side_divided_by_2 = METADATA['sensor_r']/2 * np.sqrt(np.pi)
         rectangles = []
-        for agent in self.agents:
+        coverage_rew_dict = np.zeros(shape=len(self.agents))
+
+        # randomising the coverage so that no agent is given priority
+        agent_list_id = np.arange(len(self.agents))
+        random.shuffle(agent_list_id)
+        decay = np.exp(np.array([-1/40]))
+        self.global_coverage_map = np.copy(self.global_coverage_map) * decay
+
+        for j in agent_list_id:
             #import pdb; pdb.set_trace()
-            x, y = agent.state[0], agent.state[1]
+            x, y = self.agents[j].state[0], self.agents[j].state[1]
+
             # TODO: https://colab.research.google.com/drive/15LiJpRjjNOGBWzlJUNAu8e5RpWIUa2SV?usp=sharing
-            rectangles.append([x - square_side_divided_by_2, y - square_side_divided_by_2, x + square_side_divided_by_2, y + square_side_divided_by_2])
+            r1 = int(x - square_side_divided_by_2)
+            c1 = int(y - square_side_divided_by_2)
+            r2 = int(x + square_side_divided_by_2)
+            c2 = int(y + square_side_divided_by_2)
+            r1 = r1 if r1 >0 else 0
+            c1 = c1 if c1 > 0 else 0
+            r2 = r2 if r2 < self.MAP.mapmax[0] else self.MAP.mapmax[0]
+            c2 = c2 if c2 < self.MAP.mapmax[1] else self.MAP.mapmax[1]
+
+            rectangles_x,rectangles_y = np.meshgrid(np.arange(self.MAP.mapmax[0]),np.arange(self.MAP.mapmax[1]))
+            rectangles = np.logical_and(np.logical_and(rectangles_x>=r1,rectangles_x<=r2)
+                                        ,np.logical_and(rectangles_y>=c1,rectangles_y<=c2))
+            coverage_reward = self.update_global_coverage_map(rectangles,np.exp(np.array([-1/40])))
+            coverage_rew_dict[j] = coverage_reward/(np.prod(self.MAP.mapmax))
             #self.draw_circle(grid, agent.state[0], agent.state[1], METADATA['sensor_r'])
-        sensor_footprint = union_rectangles(rectangles)
+        #sensor_footprint = union_rectangles(rectangles)
 
         #import pdb; pdb.set_trace()
-        if not self.coverage_reward_factor:
-            self.coverage_reward_factor = sensor_footprint
-        else:
-            # TODO: coverage shouldnt be dependent on number of agents; decay; how to pick number of steps to decay? size of the
-            self.coverage_reward_factor = self.coverage_reward_factor/np.prod(self.MAP.mapmax) * torch.exp(torch.Tensor([-(self.steps)/50])) + sensor_footprint
+        # if not self.coverage_reward_factor:
+        #     self.coverage_reward_factor = sensor_footprint
+        # else:
+        #     # TODO: coverage shouldnt be dependent on number of agents; decay; how to pick number of steps to decay? size of the
+        #     self.coverage_reward_factor = self.coverage_reward_factor/np.prod(self.MAP.mapmax) * torch.exp(torch.Tensor([-(self.steps)/50])) + sensor_footprint
         
         reward_dict = []
         if self.reward_type=="Max":
@@ -364,13 +400,13 @@ class setTrackingEnv2(maTrackingBase):
                 else:
                     detcov_max = - np.log(np.max(detcov))
                     #print("individual")
-                reward_dict.append(self.coverage_reward_factor.item()*c_mean*detcov_max)
+                reward_dict.append(self.coverage_reward_factor*coverage_rew_dict[id] + detcov_max )
         elif self.reward_type=="Mean":
             for id,agent in enumerate(self.agents):
                 detcov = [LA.det(b.cov) for b in agent.belief]
                 detcov = np.ravel(detcov)
                 detcov_max = - np.log(detcov).mean()
-                reward_dict.append(self.coverage_reward_factor.item()*c_mean*detcov_max)
+                reward_dict.append(self.coverage_reward_factor*coverage_rew_dict[id] + detcov_max)
         
         if scaled:
             for agent_index in range(len(reward_dict)):

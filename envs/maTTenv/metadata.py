@@ -21,6 +21,7 @@ METADATA_v1 = {
         'action_w': [np.pi/2, 0, -np.pi/2, -np.pi], # action primitives - angular velocities.
         'const_q': 0.001, # target noise constant in beliefs.
         'const_q_true': 0.01, # target noise constant of actual targets.
+        'coverage_reward': 25.0 # adding coverage reward
     }
 
 # medium
@@ -44,6 +45,7 @@ METADATA_v2 = {
         'action_w': [np.pi/2, 0, -np.pi/2, -np.pi], # action primitives - angular velocities.
         'const_q': 0.001, # target noise constant in beliefs.
         'const_q_true': 0.01, # target noise constant of actual targets.
+        'coverage_reward': 25.0 # adding coverage reward
     }
 
 # hard
@@ -67,6 +69,7 @@ METADATA_v3 = {
         'action_w': [np.pi/2, 0, -np.pi/2, -np.pi], # action primitives - angular velocities.
         'const_q': 0.001, # target noise constant in beliefs.
         'const_q_true': 0.01, # target noise constant of actual targets.
+        'coverage_reward': 25.0 # adding coverage reward
     }
 
 # really hard
@@ -90,6 +93,7 @@ METADATA_v4 = {
         'action_w': [np.pi/2, 0, -np.pi/2, -np.pi], # action primitives - angular velocities.
         'const_q': 0.001, # target noise constant in beliefs.
         'const_q_true': 0.01, # target noise constant of actual targets.
+        'coverage_reward': 25.0 # adding coverage reward
     }
 
 
@@ -114,6 +118,7 @@ METADATA_v4_no_comms = {
         'action_w': [np.pi/2, 0, -np.pi/2, -np.pi], # action primitives - angular velocities.
         'const_q': 0.001, # target noise constant in beliefs.
         'const_q_true': 0.01, # target noise constant of actual targets.
+        'coverage_reward': 25.0 # adding coverage reward
     }
 
 
@@ -138,6 +143,7 @@ METADATA_v4_inf_comms = {
         'action_w': [np.pi/2, 0, -np.pi/2, -np.pi], # action primitives - angular velocities.
         'const_q': 0.001, # target noise constant in beliefs.
         'const_q_true': 0.01, # target noise constant of actual targets.
+        'coverage_reward': 25.0 # adding coverage reward
     }
 METADATAS = {
     "1":METADATA_v1, 
@@ -148,4 +154,4 @@ METADATAS = {
     "inf_comms":METADATA_v4_inf_comms
 }
 ##Beliefs are initialized near target
-METADATA=METADATAS["4"]
+METADATA=METADATAS["inf_comms"]

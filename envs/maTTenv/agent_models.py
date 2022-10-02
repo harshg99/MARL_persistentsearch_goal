@@ -33,16 +33,28 @@ class Agent(object):
         self.collision_func = collision_func
         self.margin = margin
         self.belief = KFBelief
+        self.coverage_map = None
 
     def setupBelief(self,belief):
         #List of belief over all targets
-        self.belief = belief
+        self.belief = deepcopy(belief)
 
 
     def updateBelief(self,targetID = None,z_t=None):
         if targetID is not None and z_t is not None:
             self.belief[targetID].update(z_t,self.state)
 
+    def update_coverage_map(self,rectangle_map,decay):
+        if self.coverage_map is not None:
+            coverage_map2= np.copy(self.coverage_map)*decay
+            coverage_map2[rectangle_map] = 1.0
+            coverage_reward = np.sum(coverage_map2) - np.sum(self.coverage_map)
+            self.coverage_map = deepcopy(coverage_map2)
+        else:
+            self.coverage_map = deepcopy(rectangle_map)
+            coverage_reward = np.sum(self.coverage_map)
+
+        return coverage_reward
 
     def updateCommBelief(self,comms_recv_beliefs):
         '''
@@ -63,8 +75,8 @@ class Agent(object):
                 commslogdetCov = LA.det(comms_recv_beliefs[neigh][target_id].cov)
                 if commslogdetCov<logdetCov:
                     # update list
-                    intermediateBelief[target_id].state = comms_recv_beliefs[neigh][target_id].state
-                    intermediateBelief[target_id].cov = comms_recv_beliefs[neigh][target_id].cov
+                    intermediateBelief[target_id].state = deepcopy(comms_recv_beliefs[neigh][target_id].state)
+                    intermediateBelief[target_id].cov = deepcopy(comms_recv_beliefs[neigh][target_id].cov)
 
         return intermediateBelief
 
