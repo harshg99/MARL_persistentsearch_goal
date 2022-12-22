@@ -1,22 +1,7 @@
-# scalableMARL
+# MARL for persistent target search
 
-[Scalable Reinforcement Learning Policies for Multi-Agent Control](https://arxiv.org/abs/2011.08055)
+## File Structure
 
-CD. Hsu, H. Jeong, GJ. Pappas, P. Chaudhari. "Scalable Reinforcement Learning Policies for Multi-Agent Control". IEEE International Conference on Intelligent Robots and Systems (IROS), Prague, Czech Republic, 2021.
-
-Multi-Agent Reinforcement Learning method to learn scalable control polices for multi-agent target tracking.
-
-+ Author: Christopher Hsu
-+ Email: chsu8@seas.upenn.edu
-+ Affiliation: 
-    - Department of Electrical and Systems Engineering
-    - GRASP Laboratory
-    - @ University of Pennsylvania
-
-Currently supports Python3.8 and is developed in Ubuntu 20.04
-
-## scalableMARL file structure
-Within scalableMARL (highlighting the important files):
 ```
 scalableMARL
     |___algos
@@ -39,6 +24,17 @@ scalableMARL
         |___run_ma_tracking               #Example scipt to run environment
     |___setup                             #set PYTHONPATH ($source setup)
 ```
+
+## Acknowledgements
+Extension of work done in
+[Scalable Reinforcement Learning Policies for Multi-Agent Control](https://arxiv.org/abs/2011.08055)
+
+CD. Hsu, H. Jeong, GJ. Pappas, P. Chaudhari. "Scalable Reinforcement Learning Policies for Multi-Agent Control". IEEE International Conference on Intelligent Robots and Systems (IROS), Prague, Czech Republic, 2021.
+
+Multi-Agent Reinforcement Learning method to learn scalable control polices for multi-agent target tracking.
+
+
+## Setup
 
 + To setup scalableMARL, follow the instruction below.
 
@@ -80,15 +76,7 @@ pip3 install --trusted-host pypi.python.org -r requirements.txt
 ```
 
 ## Current workflow
-### Setup repos
-```
-# activate virtualenv
-source ./'virtualenv name'/bin/activate
-# change directory to scalableMARL
-cd ./scalableMARL
-# setup repo  ***important in order to set PYTHONPATH***
-source setup
-```
+
 scalableMARL repo is ready to go
 
 ### Running an algorithm
@@ -96,35 +84,19 @@ scalableMARL repo is ready to go
 # its best to run from the scalableMARL folder so that logging and saving is consistent
 cd ./scalableMARL
 # run the alg
-python3 algos/maTT/run_script.py
+python3 algos/maTT/run_ppo.py
 
 # you can run the alg with different argument parameters. See within run_script for more options.
 # for example
-python3 algos/maTT/run_script.py --seed 0 --logdir ./results/maPredPrey --epochs 40
+python3 algos/maTT/run_ppo.py --seed 0 --logdir ./results/maPredPrey --epochs 40
 ```
 ### To test, evaluate, and render()
 ```
 # for a general example 
-python3 algos/maTT/run_script.py --mode test --render 1 --log_dir ./results/maTT/setTracking-v0_123456789/seed_0/ --nb_test_eps 50
+python3 algos/maTT/run_ppo.py --mode test --render 1 --log_dir ./results/maTT/setTracking-v0_123456789/seed_0/ --nb_test_eps 50
 # for a saved policy in saved_results
-python3 algos/maTT/run_script.py --mode test --render 1 --log_dir ./saved_results/maTT/setTracking-v0_123456789/seed_0/
+python3 algos/maTT/run_ppo.py --mode test --render 1 --log_dir ./saved_results/maTT/setTracking-v0_123456789/seed_0/
 ```
 ### To see training curves
-```
-tensorboard --logdir ./results/maTT/setTracking-v0_123456789/
-```
-### Citing scalableMARL
-If you reference or use scalableMARL in your research, please cite:
-```
-@misc{hsu2021scalable,
-      title={Scalable Reinforcement Learning Policies for Multi-Agent Control}, 
-      author={Christopher D. Hsu and Heejin Jeong and George J. Pappas and Pratik Chaudhari},
-      year={2021},
-      eprint={2011.08055},
-      archivePrefix={arXiv},
-      primaryClass={cs.MA}
-}
-
-```
-
+Enter wandb api account and view training curves in your wandb profile
 
