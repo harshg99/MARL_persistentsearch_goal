@@ -377,3 +377,71 @@ class AgentDoubleInt2D_Nonlinear(AgentDoubleInt2D):
             return del_vx, del_vy
         else:
             return 0., 0.
+
+
+class AgentSE2Goal(Agent):
+    def __init__(self, agent_id, dim, sampling_period, limit, collision_func,
+                 margin=METADATA['margin'], policy=None):
+        super().__init__(agent_id, dim, sampling_period, limit, collision_func, margin=margin)
+        self.policy = policy
+
+    def reset(self, init_state):
+        super().reset(init_state)
+        self.xyw = [0.,0.,0.]
+        if self.policy:
+            self.policy.reset(init_state)
+
+    def set_goals(self,control_goal=None,margin_pos=None):
+        '''
+
+        :param control_goal:
+        :param marigin_pos:
+        :return: A planner which achieves the goals
+        '''
+
+        self.control_goal = control_goal
+        self.margin_pos = margin_pos
+
+
+        plan = self.plan()
+        return plan
+
+    # TODO: Write a planner
+    def plan(self):
+        '''
+        :param self: 
+        :return: returns a planner object to reach the desired control goal
+        '''
+
+        raise NotImplementedError
+
+    def update(self, control_input=None, margin_pos=None, col=False):
+        """
+        control_input : [linear_velocity, angular_velocity]
+        margin_pos : a minimum distance to a target
+        """
+
+
+        new_state = SE2Dynamics(self.state, self.sampling_period, control_input)
+        is_col = 0
+        if self.collision_check(new_state[:2]):
+            is_col = 1
+            new_state[:2] = self.state[:2]
+            control_input = self.vw
+            if self.policy is not None:
+                # self.policy.collision(new_state)
+                corrected_policy = self.policy.collision(new_state)
+                if corrected_policy is not None:
+                    new_state = SE2DynamicsVel(self.state,
+                                               self.sampling_period, corrected_policy)
+
+        elif margin_pos is not None:
+            if self.margin_check(new_state[:2], margin_pos):
+                new_state[:2] = self.state[:2]
+                control_input = self.vw
+
+        self.state = new_state
+        self.xyw = control_input
+        self.range_check()
+
+        return is_col
