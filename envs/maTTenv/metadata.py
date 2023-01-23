@@ -164,7 +164,7 @@ METADATA_Goal = {
         'init_belief_distance_max': 5.0, # the maximum distance btw belief and the target.
         'margin': 1.0, # a marginal distance btw targets and the agent.
         'margin2wall': 0.5, # a marginal distance from a wall.
-        'actions_pos': [1.5,1.5,0.5], # goal primitives position x , y, discretization
+        'actions_pos': [-1.5,1.5,0.5], # goal primitives position x , y, discretization
         'actions_yaw': [0, 360, 90], # goal primitives yaw
         'const_q': 0.001, # target noise constant in beliefs.
         'const_q_true': 0.01, # target noise constant of actual targets.

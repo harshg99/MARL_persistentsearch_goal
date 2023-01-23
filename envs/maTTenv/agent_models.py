@@ -23,6 +23,10 @@ import torch.optim as optim
 from torch.distributions.categorical import Categorical
 from copy import deepcopy
 from numpy import linalg as LA
+from trajax.integrators import rk4
+from trajax import optimizers
+import functools
+
 
 class Agent(object):
     def __init__(self, agent_id, dim, sampling_period, limit, collision_func, margin=METADATA['margin'],KFBelief = None):
@@ -151,6 +155,12 @@ def SE2Dynamics(x, dt, u):
     new_x = x + diff
     new_x[2] = util.wrap_around(new_x[2])
     return new_x
+
+
+def SE2DynamicsRK4(x, u, t):
+
+    del t
+    return np.array([u[0]*np.cos(x[2]),u[0]*np.sin(x[2]),u[1]])
 
 def SE2DynamicsVel(x, dt, u=None):  
     assert(len(x)==5) # x = [x,y,theta,v,w]
@@ -381,13 +391,14 @@ class AgentDoubleInt2D_Nonlinear(AgentDoubleInt2D):
 
 class AgentSE2Goal(Agent):
     def __init__(self, agent_id, dim, sampling_period, limit, collision_func,
-                 margin=METADATA['margin'], policy=None):
+                 margin=METADATA['margin'], policy=None,horizon= 2.0):
         super().__init__(agent_id, dim, sampling_period, limit, collision_func, margin=margin)
         self.policy = policy
+        self.horizon = horizon
 
     def reset(self, init_state):
         super().reset(init_state)
-        self.xyw = [0.,0.,0.]
+        self.vw= [0.,0.]
         if self.policy:
             self.policy.reset(init_state)
 
@@ -413,16 +424,21 @@ class AgentSE2Goal(Agent):
         :return: returns a planner object to reach the desired control goal
         '''
 
-        raise NotImplementedError
+        return SE2Planner(state = self.state,
+                          goal = self.control_goal,
+                          time = self.horizon,
+                          dynamics = SE2DynamicsRK4,
+                          dT=self.sampling_period)
 
-    def update(self, control_input=None, margin_pos=None, col=False):
+    def update(self, input=None, margin_pos=None, col=False):
         """
-        control_input : [linear_velocity, angular_velocity]
+        control_input : (state: (x,y,theta), u (v,omega))
         margin_pos : a minimum distance to a target
         """
 
 
-        new_state = SE2Dynamics(self.state, self.sampling_period, control_input)
+        new_state = input[0]
+        control_input = input[1]
         is_col = 0
         if self.collision_check(new_state[:2]):
             is_col = 1
@@ -441,7 +457,67 @@ class AgentSE2Goal(Agent):
                 control_input = self.vw
 
         self.state = new_state
-        self.xyw = control_input
+        self.vw = control_input
         self.range_check()
 
         return is_col
+
+
+class SE2Planner:
+
+    def __init__(self,state,goal,time,dynamics,dT,threshold = 1e-3,control_dim = 2):
+        '''.
+        @params:
+        goal: set a goal
+        time: set a time to reach the goal
+        dynamics: the dynamics function to containerise
+        dT: the timme discretization
+        '''
+
+        self.goal = goal
+        self.time = time
+        self.dim - len(goal)
+        self.dynamic_fn = rk4(dynamics,dt = dT)
+        self.threshold = 1e-3
+        self.dT = dT
+        self.cost_params = {
+            'x_stage_cost' : 0.5,
+            'u_stage_cost' : 0.5
+        }
+
+        self.state  = state
+        self.control_dim = control_dim
+
+        U = np.zeros((self.time,control_dim))
+        self.solution =  optimizers.ilqr(
+        functools.partial(self.cost, **self.cost_params), dynamics, self.state, U,
+        equality_constraint=self.equality_constraint,
+        constraints_threshold=self.constraints_threshold,
+        maxiter_al=10)
+
+    def cost(self,x,u,t,params):
+        delta = x - self.goal
+        stagewise_cost = 0.5 * params['x_stage_cost'] * np.dot(
+            delta, delta) + 0.5 * params['u_stage_cost'] * np.dot(u, u)
+        return np.where(t == self.time, 0.0, stagewise_cost)
+
+    def get_controller(self,time):
+        '''
+        :param time: get control input associated with the time
+        :return:
+        tuple(x,u): x is the state at time t and u is the control at time t
+        '''
+
+        x = self.solution[0][int(time/self.dT),:]
+        u = self.solution[1][int(time/self.dT),:]
+
+        return (x,u)
+
+    def equality_contraint(self,x,u,t):
+        del u
+
+        def goal_constraint(x):
+            err = x - self.goal
+            return err
+
+        return np.where(t == self.time, goal_constraint(x), np.zeros(self.control_dim))

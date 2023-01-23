@@ -123,7 +123,8 @@ class setTrackingEnvGoal(setTrackingEnv2):
         self.agents = [AgentSE2Goal(agent_id='agent-' + str(i),
                                 dim=self.agent_dim, sampling_period=self.sampling_period,
                                 limit=self.limit['agent'],
-                                collision_func=lambda x: map_utils.is_collision(self.MAP, x))
+                                collision_func=lambda x: map_utils.is_collision(self.MAP, x),
+                                horizon = self.dT)
                        for i in range(self.num_agents)]
 
 
@@ -164,7 +165,8 @@ class setTrackingEnvGoal(setTrackingEnv2):
         '''
 
         # Time increments to step low level planner
-        
+        collision = [False for _ in range(len(planners_dict))]
+
         for j in range((int(self.dT/self.sampling_period))):
             for i in range(self.nb_targets):
                 # update target
@@ -189,17 +191,21 @@ class setTrackingEnvGoal(setTrackingEnv2):
                 self.agents[agentid].setupBelief(updatedCommBelief)
 
             # Agents move (t -> t+1) and observe the targets
+
             for ii, agent_id in enumerate(planners_dict):
 
                 # returns an action
-                action_vw = planners_dict[agent_id].plan_action(j*self.sampling_period)
+
+                state, action_vw = planners_dict[agent_id].get_controller(j*self.sampling_period)
 
                 # Locations of all targets and agents in order to maintain a margin between them
                 margin_pos = [t.state[:2] for t in self.targets[:self.nb_targets]]
-                for p, ids in enumerate(action_dict):
+                for p, ids in enumerate(planners_dict):
                     if agent_id != ids:
                         margin_pos.append(np.array(self.agents[p].state[:2]))
-                _ = self.agents[ii].update(action_vw, margin_pos)
+
+                if not collision[ii]:
+                    collision[ii] = self.agents[ii].update((state,action_vw), margin_pos)
 
                 # Update beliefs of targets
                 for jj in range(self.nb_targets):
@@ -207,7 +213,7 @@ class setTrackingEnvGoal(setTrackingEnv2):
                     obs, z_t = self.observation(self.targets[jj], self.agents[ii])
                     observed[ii][jj] = obs
                     if obs:  # if observed, update the target belief.
-                        # Update agents indivuudla be,liefs based on observation
+                        # Update agents indivuudla beliefs based on observation
                         self.agents[ii].updateBelief(targetID=jj, z_t=z_t)
 
                         # Update global belief
