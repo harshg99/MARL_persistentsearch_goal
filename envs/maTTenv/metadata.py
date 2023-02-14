@@ -149,6 +149,8 @@ METADATA_v4_inf_comms = {
 
 # really hard
 METADATA_Goal = {
+        'action_v': [2, 1.33, 0.67, 0], # action primitives - linear velocities.
+        'action_w': [np.pi/2, 0, -np.pi/2, -np.pi], # action primitives - angular velocities.
         'version' : 1,
         'sensor_r': 10.0,
         'comms_r': 50.0,

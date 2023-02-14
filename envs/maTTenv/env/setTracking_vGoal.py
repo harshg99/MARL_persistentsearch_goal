@@ -41,7 +41,7 @@ class setTrackingEnvGoal(setTrackingEnv2):
 
     def __init__(self, num_agents=1, num_targets=2, map_name='empty',
                         is_training=True, known_noise=True, **kwargs):
-        super().__init__(num_agents=num_agents, num_targets=num_targets,
+        super(setTrackingEnv2,self).__init__(num_agents=num_agents, num_targets=num_targets,
                         map_name=map_name, is_training=is_training)
 
         self.steps = 0
@@ -51,7 +51,8 @@ class setTrackingEnvGoal(setTrackingEnv2):
         self.reward_type = kwargs["reward_type"]
         self.nb_agents = num_agents  # only for init, will change with reset()
         self.nb_targets = num_targets  # only for init, will change with reset()
-
+        self.agent_dim = 3
+        self.target_dim = 4
 
         self.target_init_vel = METADATA['target_init_vel'] * np.ones((2,))
         
@@ -109,9 +110,9 @@ class setTrackingEnvGoal(setTrackingEnv2):
         self.num_actions = 0
 
         # Setting the action map configurations
-        for x in range(start=actions_pos[0],end = actions_pos[1],step=actions_pos[2]):
-            for y in range(start=actions_pos[0], end=actions_pos[1], step=actions_pos[2]):
-                for z in range(start=actions_yaw[0], end=actions_yaw[1], step=actions_yaw[2]):
+        for x in np.arange(actions_pos[0],actions_pos[1],actions_pos[2]):
+            for y in np.arange(actions_pos[0],actions_pos[1],actions_pos[2]):
+                for z in np.arange(actions_yaw[0],actions_yaw[1],actions_yaw[2]):
                     self.num_actions+=1
                     self.action_map[self.num_actions] = (x,y,z)
 
@@ -146,11 +147,13 @@ class setTrackingEnvGoal(setTrackingEnv2):
                 if agent_id != ids:
                     margin_pos.append(np.array(self.agents[p].state[:2]))
             planners_dict = self.agents[ii].set_goals(action_vw, margin_pos)
-
+            planners_dict[ii] = planners_dict
             obs_dict[self.agents[ii].agent_id] = self.observe_single(ii, action_vw=action_vw, isObserved=observed[ii])
 
+        reward, reward_dict, mean_nlogdetcov = self.step_single(planners_dict)
         # Get all rewards after all agents and targets move (t -> t+1)
         reward, reward_dict, done, mean_nlogdetcov = self.get_reward(observed, self.is_training)
+        done = False
         done_dict['__all__'], info_dict['mean_nlogdetcov'] = done, mean_nlogdetcov
 
         info_dict['reward_all'] = reward_dict
@@ -219,5 +222,5 @@ class setTrackingEnvGoal(setTrackingEnv2):
                         # Update global belief
                         self.belief_targets[jj].update(z_t, self.agents[ii].state)
 
-
+        reward, reward_dict, done, mean_nlogdetcov = self.get_reward(observed, self.is_training)
 

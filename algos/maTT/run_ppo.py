@@ -6,7 +6,7 @@ import torch.nn as nn
 import gym
 from gym import wrappers
 
-from algos.maTT.dql import doubleQlearning
+#from algos.maTT.dql import doubleQlearning
 import algos.maTT.core as core
 from algos.maTT.decentralized_ppo_one_network import decentralized_ppo
 
@@ -82,7 +82,7 @@ def parse_args():
         help="the maximum norm for the gradient clipping")
     parser.add_argument("--target_kl", type=float, default=None,
         help="the target KL divergence threshold")
-    parser.add_argument('--scaled', action='store_true')
+    parser.add_argument('--scaled', action='store_true',default=False)
     parser.set_defaults(scaled=False)
     parser.add_argument('--continue_training', action='store_true')
     parser.set_defaults(continue_training=False)

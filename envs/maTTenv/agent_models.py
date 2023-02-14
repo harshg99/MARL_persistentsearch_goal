@@ -26,7 +26,8 @@ from numpy import linalg as LA
 from trajax.integrators import rk4
 from trajax import optimizers
 import functools
-
+import jax
+import jax.numpy as jnp
 
 class Agent(object):
     def __init__(self, agent_id, dim, sampling_period, limit, collision_func, margin=METADATA['margin'],KFBelief = None):
@@ -160,7 +161,7 @@ def SE2Dynamics(x, dt, u):
 def SE2DynamicsRK4(x, u, t):
 
     del t
-    return np.array([u[0]*np.cos(x[2]),u[0]*np.sin(x[2]),u[1]])
+    return jnp.array([u[0]*jnp.cos(x[2]),u[0]*jnp.sin(x[2]),u[1]])
 
 def SE2DynamicsVel(x, dt, u=None):  
     assert(len(x)==5) # x = [x,y,theta,v,w]
@@ -417,7 +418,6 @@ class AgentSE2Goal(Agent):
         plan = self.plan()
         return plan
 
-    # TODO: Write a planner
     def plan(self):
         '''
         :param self: 
@@ -474,9 +474,12 @@ class SE2Planner:
         dT: the timme discretization
         '''
 
-        self.goal = goal
+        self.goal = list(goal)
+        self.goal[-1] = self.goal[-1]/360*2*np.pi
+        self.goal = jnp.asarray(self.goal)
+        self.goal += jnp.array(state)
         self.time = time
-        self.dim - len(goal)
+        self.dim = len(goal)
         self.dynamic_fn = rk4(dynamics,dt = dT)
         self.threshold = 1e-3
         self.dT = dT
@@ -485,21 +488,24 @@ class SE2Planner:
             'u_stage_cost' : 0.5
         }
 
-        self.state  = state
+        self.state  = jnp.asarray(state)
         self.control_dim = control_dim
+        self.u_lower = -2.5 * jnp.ones(self.control_dim)
+        self.u_upper = 2.5 * jnp.ones(self.control_dim)
 
-        U = np.zeros((self.time,control_dim))
-        self.solution =  optimizers.ilqr(
-        functools.partial(self.cost, **self.cost_params), dynamics, self.state, U,
+        U = jnp.zeros((int(self.time/self.dT),control_dim))
+        self.solution =  optimizers.constrained_ilqr(
+        functools.partial(self.cost, params = self.cost_params), self.dynamic_fn, self.state, U,
         equality_constraint=self.equality_constraint,
-        constraints_threshold=self.constraints_threshold,
-        maxiter_al=10)
+        inequality_constraint=self.inequality_constraint,
+        constraints_threshold=self.threshold,
+        maxiter_al=1000)
 
     def cost(self,x,u,t,params):
         delta = x - self.goal
-        stagewise_cost = 0.5 * params['x_stage_cost'] * np.dot(
-            delta, delta) + 0.5 * params['u_stage_cost'] * np.dot(u, u)
-        return np.where(t == self.time, 0.0, stagewise_cost)
+        stagewise_cost = 0.5 * params['x_stage_cost'] * jnp.dot(
+            delta, delta) + 0.5 * params['u_stage_cost'] * jnp.dot(u, u)
+        return jnp.where(t == self.time, 0.0, stagewise_cost)
 
     def get_controller(self,time):
         '''
@@ -513,11 +519,18 @@ class SE2Planner:
 
         return (x,u)
 
-    def equality_contraint(self,x,u,t):
+    def equality_constraint(self,x,u,t):
         del u
 
         def goal_constraint(x):
             err = x - self.goal
             return err
 
-        return np.where(t == self.time, goal_constraint(x), np.zeros(self.control_dim))
+        return jnp.where(t == self.time, goal_constraint(x), np.zeros(self.dim))
+
+    def inequality_constraint(self,x, u, t):
+
+      def control_limits(u):
+        return jnp.concatenate((self.u_lower - u, u - self.u_upper))
+
+      return jnp.where(t == self.time, jnp.zeros(2 * self.control_dim),control_limits(u))
