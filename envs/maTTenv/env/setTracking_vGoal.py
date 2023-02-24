@@ -113,8 +113,8 @@ class setTrackingEnvGoal(setTrackingEnv2):
         for x in np.arange(actions_pos[0],actions_pos[1],actions_pos[2]):
             for y in np.arange(actions_pos[0],actions_pos[1],actions_pos[2]):
                 for z in np.arange(actions_yaw[0],actions_yaw[1],actions_yaw[2]):
-                    self.num_actions+=1
                     self.action_map[self.num_actions] = (x,y,z)
+                    self.num_actions += 1
 
 
         self.action_space = spaces.Discrete(self.num_actions)
@@ -203,9 +203,9 @@ class setTrackingEnvGoal(setTrackingEnv2):
         # Time increments to step low level planner
         collision = [False for _ in range(len(planners_dict))]
         observed = np.zeros((self.nb_agents, self.nb_targets), dtype=bool)
-        mean_reward = 0
-        mean_reward_dict = {k:0 for k in range(len(planners_dict.keys()))}
-        mean_mean_logdetcov = None if self.is_training else 0
+        mean_reward = 0.0
+        mean_reward_dict = np.array([0.0 for _ in range(len(planners_dict.keys()))])
+        mean_mean_logdetcov = None if self.is_training else 0.0
 
         for j in range((int(self.dT/self.sampling_period))):
             for i in range(self.nb_targets):
@@ -259,18 +259,18 @@ class setTrackingEnvGoal(setTrackingEnv2):
                         # Update global belief
                         self.belief_targets[jj].update(z_t, self.agents[ii].state)
 
-            coverage_reward = self.update_global_coverage()
+            coverage_reward = np.array(self.update_global_coverage())
             reward, reward_dict, done, mean_nlogdetcov = self.get_reward(observed, self.is_training)
 
             mean_reward += reward
-            mean_reward_dict = {k:mean_reward_dict[k] + reward_dict[k]+ self.coverage_reward_factor*coverage_reward[k]
-                                for k in mean_reward_dict.keys()}
+            mean_reward_dict += (reward_dict + self.coverage_reward_factor*coverage_reward)
+
 
             if not self.is_training:
                 mean_mean_logdetcov += mean_nlogdetcov
 
         mean_reward /= (int(self.dT/self.sampling_period))
-        mean_reward_dict = {k:mean_reward_dict[k]/(int(self.dT/self.sampling_period)) for k in mean_reward_dict.keys()}
+        mean_reward_dict = mean_reward_dict / (int(self.dT/self.sampling_period))
 
         if not self.is_training:
             mean_mean_logdetcov /= (int(self.dT/self.sampling_period))
