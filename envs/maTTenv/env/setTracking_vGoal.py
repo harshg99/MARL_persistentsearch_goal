@@ -146,20 +146,53 @@ class setTrackingEnvGoal(setTrackingEnv2):
             for p, ids in enumerate(action_dict):
                 if agent_id != ids:
                     margin_pos.append(np.array(self.agents[p].state[:2]))
-            planners_dict = self.agents[ii].set_goals(action_vw, margin_pos)
-            planners_dict[ii] = planners_dict
-            obs_dict[self.agents[ii].agent_id] = self.observe_single(ii, action_vw=action_vw, isObserved=observed[ii])
+            planners = self.agents[ii].set_goals(action_vw, margin_pos)
+            planners_dict[ii] = planners
 
-        reward, reward_dict, mean_nlogdetcov = self.step_single(planners_dict)
+        observed, reward, reward_dict, mean_logdetcov = self.step_single(planners_dict)
+
         # Get all rewards after all agents and targets move (t -> t+1)
-        reward, reward_dict, done, mean_nlogdetcov = self.get_reward(observed, self.is_training)
+        for ii, agent_id in enumerate(action_dict):
+            obs_dict[self.agents[ii].agent_id] = self.observe_single(
+                ii,  action_vw=self.action_map[action_dict[agent_id]],
+                isObserved=observed[ii]
+            )
+        # Get all rewards after all agents and targets move (t -> t+1)
+
         done = False
-        done_dict['__all__'], info_dict['mean_nlogdetcov'] = done, mean_nlogdetcov
+        done_dict['__all__'], info_dict['mean_nlogdetcov'] = done, mean_logdetcov
 
         info_dict['reward_all'] = reward_dict
         info_dict['metrics'] = [self.calculate_total_uncertainity(), self.calculate_max_uncertainity()]
         self.steps += 1
         return obs_dict, reward, done, info_dict
+
+    def observe_single(self,agentID,action_vw = None,isObserved = None):
+        observation = []
+        for jj in range(self.nb_targets):
+            r, alpha = util.relative_distance_polar(self.agents[agentID].belief[jj].state[:2],
+                                                    xy_base=self.agents[agentID].state[:2],
+                                                    theta_base=self.agents[agentID].state[2])
+            if action_vw is None:
+                r_dot_b,alpha_dot_b = 0.0,0.0
+            else:
+                r_dot_b, alpha_dot_b = util.relative_velocity_polar(
+                    self.agents[agentID].belief[jj].state[:2],
+                    self.agents[agentID].belief[jj].state[2:],
+                    self.agents[agentID].state[:2], self.agents[agentID].state[-1],
+                    action_vw[0], action_vw[1])
+
+            logdetcov = np.log(LA.det(self.agents[agentID].belief[jj].cov))
+            if action_vw is None:
+                observed = 0.0
+            else:
+                observed = float(isObserved[jj])
+
+            observation.append([self.agents[agentID].state[0]/self.MAP.mapmax[0],
+                                self.agents[agentID].state[1]/self.MAP.mapmax[0],
+                                r, alpha, r_dot_b, alpha_dot_b, logdetcov, observed])
+
+        return torch.tensor(observation,dtype=torch.float32)
 
     def step_single(self,planners_dict):
         '''
@@ -169,6 +202,10 @@ class setTrackingEnvGoal(setTrackingEnv2):
 
         # Time increments to step low level planner
         collision = [False for _ in range(len(planners_dict))]
+        observed = np.zeros((self.nb_agents, self.nb_targets), dtype=bool)
+        mean_reward = 0
+        mean_reward_dict = {k:0 for k in range(len(planners_dict.keys()))}
+        mean_mean_logdetcov = None if self.is_training else 0
 
         for j in range((int(self.dT/self.sampling_period))):
             for i in range(self.nb_targets):
@@ -222,5 +259,98 @@ class setTrackingEnvGoal(setTrackingEnv2):
                         # Update global belief
                         self.belief_targets[jj].update(z_t, self.agents[ii].state)
 
-        reward, reward_dict, done, mean_nlogdetcov = self.get_reward(observed, self.is_training)
+            coverage_reward = self.update_global_coverage()
+            reward, reward_dict, done, mean_nlogdetcov = self.get_reward(observed, self.is_training)
 
+            mean_reward += reward
+            mean_reward_dict = {k:mean_reward_dict[k] + reward_dict[k]+ self.coverage_reward_factor*coverage_reward[k]
+                                for k in mean_reward_dict.keys()}
+
+            if not self.is_training:
+                mean_mean_logdetcov += mean_nlogdetcov
+
+        mean_reward /= (int(self.dT/self.sampling_period))
+        mean_reward_dict = {k:mean_reward_dict[k]/(int(self.dT/self.sampling_period)) for k in mean_reward_dict.keys()}
+
+        if not self.is_training:
+            mean_mean_logdetcov /= (int(self.dT/self.sampling_period))
+
+        return observed, reward, mean_reward_dict,  mean_mean_logdetcov
+
+        # reward, reward_dict, done, mean_nlogdetcov = self.get_reward(observed, self.is_training)
+    def update_global_coverage(self):
+        agent_list_id = np.arange(len(self.agents))
+        random.shuffle(agent_list_id)
+        decay = np.exp(np.array([-1 / 40]))
+        self.global_coverage_map = np.copy(self.global_coverage_map) * decay
+        square_side_divided_by_2 = METADATA['sensor_r'] / 2 * np.sqrt(np.pi)
+        rectangles = []
+        coverage_rew_dict = np.zeros(shape=len(self.agents))
+
+        for j in agent_list_id:
+            # import pdb; pdb.set_trace()
+            x, y = self.agents[j].state[0], self.agents[j].state[1]
+            r1 = int(x - square_side_divided_by_2)
+            c1 = int(y - square_side_divided_by_2)
+            r2 = int(x + square_side_divided_by_2)
+            c2 = int(y + square_side_divided_by_2)
+            r1 = r1 if r1 > 0 else 0
+            c1 = c1 if c1 > 0 else 0
+            r2 = r2 if r2 < self.MAP.mapmax[0] else self.MAP.mapmax[0]
+            c2 = c2 if c2 < self.MAP.mapmax[1] else self.MAP.mapmax[1]
+
+            rectangles_x, rectangles_y = np.meshgrid(np.arange(self.MAP.mapmax[0]), np.arange(self.MAP.mapmax[1]))
+            rectangles = np.logical_and(np.logical_and(rectangles_x >= r1, rectangles_x <= r2)
+                                        , np.logical_and(rectangles_y >= c1, rectangles_y <= c2))
+            coverage_reward = self.update_global_coverage_map(rectangles, np.exp(np.array([-1 / 40])))
+            coverage_rew_dict[j] = coverage_reward / (np.prod(self.MAP.mapmax))
+            # self.draw_circle(grid, agent.state[0], agent.state[1], METADATA['sensor_r'])
+            # sensor_footprint = union_rectangles(rectangles)
+
+        return coverage_rew_dict
+
+    def get_reward(self, observed=None, is_training=True):
+        return self.reward_fun(self.agents, self.nb_targets, self.belief_targets, is_training, c_mean=0.1,
+                               scaled=self.scaled)
+
+    def reward_fun(self, agents, nb_targets, belief_targets, is_training=True, c_mean=0.05, scaled=False):
+        # TODO: reward should be per agent
+        globaldetcov = [LA.det(b_target.cov) for b_target in belief_targets]
+
+        globaldetcov = np.ravel(globaldetcov)
+
+        r_detcov_sum = - np.sum(np.log(globaldetcov))
+        reward = c_mean * r_detcov_sum
+
+        ## discretize grid
+        # grid = torch.zeros(self.MAP.mapmax[0], self.MAP.mapmax[1])
+        ## find occupied cells by all agent's sensor radius
+
+
+        # randomising the coverage so that no agent is given priority
+        coverage_rew_dict = np.zeros(shape=len(self.agents))
+
+        reward_dict = []
+        if self.reward_type == "Max":
+            for id, agent in enumerate(self.agents):
+                detcov = [LA.det(b.cov) for b in agent.belief]
+                detcov = np.ravel(detcov)
+                if is_training:
+                    detcov_max = - c_mean*np.log(np.max(detcov))
+                    # print("centralized")
+                else:
+                    detcov_max = - c_mean*np.log(np.max(detcov))
+                    # print("individual")
+                reward_dict.append(detcov_max)
+        elif self.reward_type == "Mean":
+            for id, agent in enumerate(self.agents):
+                detcov = [LA.det(b.cov) for b in agent.belief]
+                detcov = np.ravel(detcov)
+                detcov_max = - c_mean * np.log(detcov).mean()
+                reward_dict.append( detcov_max)
+
+        mean_nlogdetcov = None
+        if not (is_training):
+            logdetcov = [np.log(LA.det(b_target.cov)) for b_target in belief_targets[:nb_targets]]
+            mean_nlogdetcov = -np.mean(logdetcov)
+        return reward, np.array(reward_dict), False, mean_nlogdetcov

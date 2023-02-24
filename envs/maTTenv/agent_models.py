@@ -515,23 +515,23 @@ class SE2Planner:
         from matplotlib import pyplot as plt
 
         # plot all states
-        plt.figure()
-        plt.plot(self.state[0], self.state[1], 'g*')
-        plt.plot(self.solution[0][:,0], self.solution[0][:,1], 'b')
-        plt.plot(self.goal[0], self.goal[1], 'r*')
-        plt.xlabel('x')
-        plt.ylabel('y')
-        plt.title('States')
-        #plt.show()
-
-        # plot all scontrols
-        plt.figure()
-        plt.plot(self.solution[1][:,0], 'b')
-        plt.plot(self.solution[1][:,1], 'b')
-        plt.xlabel('t')
-        plt.ylabel('u')
-        plt.title('Controls')
-        plt.show()
+        # plt.figure()
+        # plt.plot(self.state[0], self.state[1], 'g*')
+        # plt.plot(self.solution[0][:,0], self.solution[0][:,1], 'b')
+        # plt.plot(self.goal[0], self.goal[1], 'r*')
+        # plt.xlabel('x')
+        # plt.ylabel('y')
+        # plt.title('States')
+        # #plt.show()
+        #
+        # # plot all scontrols
+        # plt.figure()
+        # plt.plot(self.solution[1][:,0], 'b')
+        # plt.plot(self.solution[1][:,1], 'b')
+        # plt.xlabel('t')
+        # plt.ylabel('u')
+        # plt.title('Controls')
+        # plt.show()
 
         return
 
@@ -551,8 +551,8 @@ class SE2Planner:
         tuple(x,u): x is the state at time t and u is the control at time t
         '''
 
-        x = self.solution[0][int(time/self.dT),:]
-        u = self.solution[1][int(time/self.dT),:]
+        x = np.array(self.solution[0][int(time/self.dT),:])
+        u = np.array(self.solution[1][int(time/self.dT),:])
 
         return (x,u)
 

@@ -175,7 +175,9 @@ class setTrackingEnv2(maTrackingBase):
             else:
                 observed = float(isObserved[jj])
 
-            observation.append([self.agents[agentID].state[0]/self.MAP.mapmax[0], self.agents[agentID].state[1]/self.MAP.mapmax[0], r, alpha, r_dot_b, alpha_dot_b, logdetcov, observed])
+            observation.append([self.agents[agentID].state[0]/self.MAP.mapmax[0],
+                                self.agents[agentID].state[1]/self.MAP.mapmax[0],
+                                r, alpha, r_dot_b, alpha_dot_b, logdetcov, observed])
 
         return torch.tensor(observation,dtype=torch.float32)
     
