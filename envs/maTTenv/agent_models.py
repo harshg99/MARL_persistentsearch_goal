@@ -484,28 +484,65 @@ class SE2Planner:
         self.threshold = 1e-3
         self.dT = dT
         self.cost_params = {
-            'x_stage_cost' : 0.5,
-            'u_stage_cost' : 0.5
+            'x_stage_cost' : 2.0,
+            'u_stage_cost' : 1.0
         }
 
         self.state  = jnp.asarray(state)
         self.control_dim = control_dim
-        self.u_lower = -2.5 * jnp.ones(self.control_dim)
-        self.u_upper = 2.5 * jnp.ones(self.control_dim)
+        self.u_lower = -4.0 * jnp.ones(self.control_dim)
+        self.u_upper = 4.0 * jnp.ones(self.control_dim)
 
         U = jnp.zeros((int(self.time/self.dT),control_dim))
+
+
         self.solution =  optimizers.constrained_ilqr(
         functools.partial(self.cost, params = self.cost_params), self.dynamic_fn, self.state, U,
         equality_constraint=self.equality_constraint,
         inequality_constraint=self.inequality_constraint,
         constraints_threshold=self.threshold,
-        maxiter_al=1000)
+        maxiter_al=10)
+
+
+        # print(" State Current {}".format(self.state))
+        # print(" State Goal {}".format(self.goal))
+        # print("States: {}".format(self.solution[0]))
+        # print("Controls: {}".format(self.solution[1]))
+        # print("Cost: {}".format(self.solution[2]))
+        # print("Equality constraint: {}".format(self.solution[3]))
+        # print("Inequality constraint: {}".format(self.solution[4]))
+
+        from matplotlib import pyplot as plt
+
+        # plot all states
+        plt.figure()
+        plt.plot(self.state[0], self.state[1], 'g*')
+        plt.plot(self.solution[0][:,0], self.solution[0][:,1], 'b')
+        plt.plot(self.goal[0], self.goal[1], 'r*')
+        plt.xlabel('x')
+        plt.ylabel('y')
+        plt.title('States')
+        #plt.show()
+
+        # plot all scontrols
+        plt.figure()
+        plt.plot(self.solution[1][:,0], 'b')
+        plt.plot(self.solution[1][:,1], 'b')
+        plt.xlabel('t')
+        plt.ylabel('u')
+        plt.title('Controls')
+        plt.show()
+
+        return
 
     def cost(self,x,u,t,params):
         delta = x - self.goal
-        stagewise_cost = 0.5 * params['x_stage_cost'] * jnp.dot(
-            delta, delta) + 0.5 * params['u_stage_cost'] * jnp.dot(u, u)
-        return jnp.where(t == self.time, 0.0, stagewise_cost)
+
+        stagewise_cost = 0.5 * params['x_stage_cost'] * jnp.dot( delta, delta) \
+                         + 0.5 * params['u_stage_cost'] * jnp.dot(u, u)
+        terminal_cost = params['x_stage_cost'] * jnp.dot(
+            delta, delta)
+        return jnp.where(t == int(self.time/self.dT), terminal_cost, stagewise_cost)
 
     def get_controller(self,time):
         '''
@@ -526,11 +563,13 @@ class SE2Planner:
             err = x - self.goal
             return err
 
-        return jnp.where(t == self.time, goal_constraint(x), np.zeros(self.dim))
+        return jnp.where(t == int(self.time/self.dT), goal_constraint(x), np.zeros(self.dim))
 
     def inequality_constraint(self,x, u, t):
 
-      def control_limits(u):
-        return jnp.concatenate((self.u_lower - u, u - self.u_upper))
+        del x
+        def control_limits(u):
+            return jnp.concatenate((-u + self.u_lower, u - self.u_upper))
 
-      return jnp.where(t == self.time, jnp.zeros(2 * self.control_dim),control_limits(u))
+
+        return jnp.where(t == int(self.time/self.dT), jnp.zeros(2 * self.control_dim),control_limits(u))
