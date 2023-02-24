@@ -2,7 +2,7 @@ import maTTenv
 import numpy as np
 import argparse
 import gym
-from stable_baselines.common.cmd_util import make_vec_env
+
 
 parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 parser.add_argument('--env', help='environment ID', type=str, default='setTracking-v0')
@@ -13,6 +13,8 @@ parser.add_argument('--nb_targets', help='the number of targets', type=int, defa
 parser.add_argument('--num_envs', help='the number of envs', type=int, default=4)
 parser.add_argument('--log_dir', help='a path to a directory to log your data', type=str, default='.')
 parser.add_argument('--map', type=str, default="emptyMed")
+
+parser.add_argument('--max_steps', type=int, default=1000)
 
 args = parser.parse_args()
 
@@ -27,7 +29,9 @@ def main():
                     num_agents=args.nb_agents,
                     num_targets=args.nb_targets,
                     is_training=False,
-                    num_envs=args.num_envs
+                    num_envs=args.num_envs,
+                    scaled= False,
+                    reward_type="Max"
                     )
     
     nlogdetcov = []
@@ -38,7 +42,7 @@ def main():
     # from IPython import embed; embed()
     # See below why this check is needed for training or eval loop
     i = 1
-    while np.sum(done) != args.num_envs:
+    while np.sum(done) != args.num_envs and i < args.max_steps:
         if args.render:
             envs.envs[0].render()
             #for env_i in range(args.num_envs):
