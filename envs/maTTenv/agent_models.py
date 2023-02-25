@@ -403,7 +403,7 @@ class AgentSE2Goal(Agent):
         if self.policy:
             self.policy.reset(init_state)
 
-    def set_goals(self,control_goal=None,margin_pos=None):
+    def set_goals(self,control_goal=None,margin_pos=None,DEBUG=False):
         '''
 
         :param control_goal:
@@ -415,10 +415,10 @@ class AgentSE2Goal(Agent):
         self.margin_pos = margin_pos
 
 
-        plan = self.plan()
+        plan = self.plan(DEBUG)
         return plan
 
-    def plan(self):
+    def plan(self,DEBUG=False):
         '''
         :param self: 
         :return: returns a planner object to reach the desired control goal
@@ -428,7 +428,8 @@ class AgentSE2Goal(Agent):
                           goal = self.control_goal,
                           time = self.horizon,
                           dynamics = SE2DynamicsRK4,
-                          dT=self.sampling_period)
+                          dT=self.sampling_period,
+                          DEBUG=DEBUG)
 
     def update(self, input=None, margin_pos=None, col=False):
         """
@@ -465,7 +466,7 @@ class AgentSE2Goal(Agent):
 
 class SE2Planner:
 
-    def __init__(self,state,goal,time,dynamics,dT,threshold = 1e-3,control_dim = 2):
+    def __init__(self,state,goal,time,dynamics,dT,threshold = 1e-3,control_dim = 2,DEBUG = True):
         '''.
         @params:
         goal: set a goal
@@ -490,8 +491,8 @@ class SE2Planner:
 
         self.state  = jnp.asarray(state)
         self.control_dim = control_dim
-        self.u_lower = -4.0 * jnp.ones(self.control_dim)
-        self.u_upper = 4.0 * jnp.ones(self.control_dim)
+        self.u_lower = -6.0 * jnp.ones(self.control_dim)
+        self.u_upper = 6.0 * jnp.ones(self.control_dim)
 
         U = jnp.zeros((int(self.time/self.dT),control_dim))
 
@@ -512,26 +513,27 @@ class SE2Planner:
         # print("Equality constraint: {}".format(self.solution[3]))
         # print("Inequality constraint: {}".format(self.solution[4]))
 
-        from matplotlib import pyplot as plt
+        if DEBUG:
+            from matplotlib import pyplot as plt
 
-        # plot all states
-        # plt.figure()
-        # plt.plot(self.state[0], self.state[1], 'g*')
-        # plt.plot(self.solution[0][:,0], self.solution[0][:,1], 'b')
-        # plt.plot(self.goal[0], self.goal[1], 'r*')
-        # plt.xlabel('x')
-        # plt.ylabel('y')
-        # plt.title('States')
-        # #plt.show()
-        #
-        # # plot all scontrols
-        # plt.figure()
-        # plt.plot(self.solution[1][:,0], 'b')
-        # plt.plot(self.solution[1][:,1], 'b')
-        # plt.xlabel('t')
-        # plt.ylabel('u')
-        # plt.title('Controls')
-        # plt.show()
+            #plot all states
+            plt.figure()
+            plt.plot(self.state[0], self.state[1], 'g*')
+            plt.plot(self.solution[0][:,0], self.solution[0][:,1], 'b')
+            plt.plot(self.goal[0], self.goal[1], 'r*')
+            plt.xlabel('x')
+            plt.ylabel('y')
+            plt.title('States')
+            #plt.show()
+
+            # plot all scontrols
+            plt.figure()
+            plt.plot(self.solution[1][:,0], 'b')
+            plt.plot(self.solution[1][:,1], 'b')
+            plt.xlabel('t')
+            plt.ylabel('u')
+            plt.title('Controls')
+            plt.show()
 
         return
 

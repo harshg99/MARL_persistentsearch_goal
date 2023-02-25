@@ -37,6 +37,7 @@ setTrackingEnv0 : Double Integrator Target model with KF belief tracker
 
 """
 
+DEBUG = False
 class setTrackingEnvGoal(setTrackingEnv2):
 
     def __init__(self, num_agents=1, num_targets=2, map_name='empty',
@@ -46,6 +47,7 @@ class setTrackingEnvGoal(setTrackingEnv2):
 
         self.steps = 0
         self.id = 'setTracking-vGoal'
+        self.metadata = self.id
         self.metadata = self.id
         self.scaled = kwargs["scaled"]
         self.reward_type = kwargs["reward_type"]
@@ -146,6 +148,10 @@ class setTrackingEnvGoal(setTrackingEnv2):
             for p, ids in enumerate(action_dict):
                 if agent_id != ids:
                     margin_pos.append(np.array(self.agents[p].state[:2]))
+            if DEBUG:
+                for k,v in self.action_map.items():
+                    self.agents[ii].set_goals(v,margin_pos,DEBUG)
+
             planners = self.agents[ii].set_goals(action_vw, margin_pos)
             planners_dict[ii] = planners
 
