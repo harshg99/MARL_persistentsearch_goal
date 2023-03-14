@@ -14,7 +14,7 @@ parser.add_argument('--num_envs', help='the number of envs', type=int, default=4
 parser.add_argument('--log_dir', help='a path to a directory to log your data', type=str, default='.')
 parser.add_argument('--map', type=str, default="emptyMed")
 
-parser.add_argument('--max_steps', type=int, default=1000)
+parser.add_argument('--max_steps', type=int, default=250)
 
 args = parser.parse_args()
 
