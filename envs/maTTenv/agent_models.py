@@ -403,7 +403,7 @@ class AgentSE2Goal(Agent):
         if self.policy:
             self.policy.reset(init_state)
 
-    def set_goals(self,control_goal=None,margin_pos=None,DEBUG=False):
+    def set_goals(self,control_goal=None,step_goal = False,margin_pos=None,DEBUG=False):
         '''
 
         :param control_goal:
@@ -414,8 +414,10 @@ class AgentSE2Goal(Agent):
         self.control_goal = control_goal
         self.margin_pos = margin_pos
 
-
-        plan = self.plan(DEBUG)
+        if not step_goal:
+            plan = self.plan(DEBUG)
+        else:
+            plan = np.array(deepcopy(control_goal))
         return plan
 
     def plan(self,DEBUG=False):
@@ -431,7 +433,7 @@ class AgentSE2Goal(Agent):
                           dT=self.sampling_period,
                           DEBUG=DEBUG)
 
-    def update(self, input=None, margin_pos=None, col=False):
+    def update(self, input=None, margin_pos=None, col=False, step_goal = False):
         """
         control_input : (state: (x,y,theta), u (v,omega))
         margin_pos : a minimum distance to a target
@@ -476,7 +478,7 @@ class SE2Planner:
         '''
 
         self.goal = list(goal)
-        self.goal[-1] = self.goal[-1]/360*2*np.pi
+        self.goal[-1] = self.goal[-1]
         self.goal = jnp.asarray(self.goal)
         self.goal += jnp.array(state)
         self.time = time
