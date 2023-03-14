@@ -59,9 +59,15 @@ class setTrackingEnvGoal(setTrackingEnv2):
         self.target_init_vel = METADATA['target_init_vel'] * np.ones((2,))
         
         # Setting simulation time
-        self.dT = METADATA['dT']
-        self.sampling_period = METADATA['sampling_period']
+        self.step_goal = METADATA['step_goal']
 
+
+        self.dT = METADATA['dT']
+
+        if not self.step_goal:
+            self.sampling_period = METADATA['sampling_period']
+        else:
+            self.sampling_period = self.dT
 
         # LIMIT
         self.limit = {}  # 0: low, 1:highs
@@ -130,6 +136,18 @@ class setTrackingEnvGoal(setTrackingEnv2):
                                 horizon = self.dT)
                        for i in range(self.num_agents)]
 
+    def reset(self):
+        obs = super(setTrackingEnvGoal, self).reset()
+
+        for i in range(self.num_agents):
+            self.agents[i].state[-1] += np.pi
+            self.agents[i].state[-1] = int(self.agents[i].state[-1] / (np.pi / 2.0)) * np.pi
+
+        obs_dict = {}
+        for kk in range(self.nb_agents):
+            obs_dict[self.agents[kk].agent_id] = self.observe_single(kk)
+
+        return obs_dict
 
     def step(self, action_dict):
         obs_dict = {}
@@ -152,7 +170,10 @@ class setTrackingEnvGoal(setTrackingEnv2):
                 for k,v in self.action_map.items():
                     self.agents[ii].set_goals(v,margin_pos,DEBUG)
 
-            planners = self.agents[ii].set_goals(action_vw, margin_pos)
+
+            planners = self.agents[ii].set_goals(control_goal = action_vw,
+                                                 margin_pos = margin_pos,
+                                                 step_goal = self.step_goal)
             planners_dict[ii] = planners
 
         observed, reward, reward_dict, mean_logdetcov = self.step_single(planners_dict)
@@ -202,7 +223,7 @@ class setTrackingEnvGoal(setTrackingEnv2):
 
     def step_single(self,planners_dict):
         '''
-        :param planners_dict: Goal based planners for each agent
+        :param planners_dict: Goal based planners for each agent or just the ooal for rach agent
         :return: return whether all agents have reached the goals
         '''
 
@@ -213,7 +234,72 @@ class setTrackingEnvGoal(setTrackingEnv2):
         mean_reward_dict = np.array([0.0 for _ in range(len(planners_dict.keys()))])
         mean_mean_logdetcov = None if self.is_training else 0.0
 
-        for j in range((int(self.dT/self.sampling_period))):
+
+        # Low level control
+        if not self.step_goal:
+            for j in range((int(self.dT/self.sampling_period))):
+                for i in range(self.nb_targets):
+                    # update target
+                    self.targets[i].update()  # self.targets[i].reset(np.concatenate((init_pose['targets'][i][:2], self.target_init_vel)))
+                    for j in range(self.nb_agents):
+                        self.agents[j].belief[i].predict()
+
+                    self.belief_targets[i].predict()  # Belief state at t+1
+                # Target and map observations
+                observed = np.zeros((self.nb_agents, self.nb_targets), dtype=bool)
+
+                # Communication
+                agent_graph = self.communicate_graph()
+
+                update_comm_beliefs = []
+
+                for id in agent_graph.keys():
+                    comm_recv_beliefs = [self.agents[ID].belief for ID in agent_graph[id]]
+                    update_comm_beliefs.append(self.agents[id].updateCommBelief(comm_recv_beliefs))
+
+                for agentid, updatedCommBelief in enumerate(update_comm_beliefs):
+                    self.agents[agentid].setupBelief(updatedCommBelief)
+
+                # Agents move (t -> t+1) and observe the targets
+
+                for ii, agent_id in enumerate(planners_dict):
+
+                    # returns an action
+
+                    state, action_vw = planners_dict[agent_id].get_controller(j*self.sampling_period)
+
+                    # Locations of all targets and agents in order to maintain a margin between them
+                    margin_pos = [t.state[:2] for t in self.targets[:self.nb_targets]]
+                    for p, ids in enumerate(planners_dict):
+                        if agent_id != ids:
+                            margin_pos.append(np.array(self.agents[p].state[:2]))
+
+                    if not collision[ii]:
+                        collision[ii] = self.agents[ii].update((state,action_vw), margin_pos)
+
+                    # Update beliefs of targets
+                    for jj in range(self.nb_targets):
+                        # Observe
+                        obs, z_t = self.observation(self.targets[jj], self.agents[ii])
+                        observed[ii][jj] = obs
+                        if obs:  # if observed, update the target belief.
+                            # Update agents indivuudla beliefs based on observation
+                            self.agents[ii].updateBelief(targetID=jj, z_t=z_t)
+
+                            # Update global belief
+                            self.belief_targets[jj].update(z_t, self.agents[ii].state)
+
+                coverage_reward = np.array(self.update_global_coverage())
+                reward, reward_dict, done, mean_nlogdetcov = self.get_reward(observed, self.is_training)
+
+                mean_reward += reward
+                mean_reward_dict += (reward_dict + self.coverage_reward_factor*coverage_reward)
+
+
+                if not self.is_training:
+                    mean_mean_logdetcov += mean_nlogdetcov
+        else:
+            # update target
             for i in range(self.nb_targets):
                 # update target
                 self.targets[i].update()  # self.targets[i].reset(np.concatenate((init_pose['targets'][i][:2], self.target_init_vel)))
@@ -221,7 +307,7 @@ class setTrackingEnvGoal(setTrackingEnv2):
                     self.agents[j].belief[i].predict()
 
                 self.belief_targets[i].predict()  # Belief state at t+1
-            # Target and map observations
+                # Target and map observations
             observed = np.zeros((self.nb_agents, self.nb_targets), dtype=bool)
 
             # Communication
@@ -239,11 +325,10 @@ class setTrackingEnvGoal(setTrackingEnv2):
             # Agents move (t -> t+1) and observe the targets
 
             for ii, agent_id in enumerate(planners_dict):
-
-                # returns an action
-
-                state, action_vw = planners_dict[agent_id].get_controller(j*self.sampling_period)
-
+                state = np.zeros(len(self.agents[agent_id].state))
+                state[:2] = self.agents[agent_id].state[:2] + planners_dict[agent_id][:2]
+                state[-1] = planners_dict[agent_id][-1]
+                action_vw = np.array([0,0])
                 # Locations of all targets and agents in order to maintain a margin between them
                 margin_pos = [t.state[:2] for t in self.targets[:self.nb_targets]]
                 for p, ids in enumerate(planners_dict):
@@ -251,7 +336,7 @@ class setTrackingEnvGoal(setTrackingEnv2):
                         margin_pos.append(np.array(self.agents[p].state[:2]))
 
                 if not collision[ii]:
-                    collision[ii] = self.agents[ii].update((state,action_vw), margin_pos)
+                    collision[ii] = self.agents[ii].update((state, action_vw), margin_pos, step_goal = self.step_goal)
 
                 # Update beliefs of targets
                 for jj in range(self.nb_targets):
@@ -269,11 +354,11 @@ class setTrackingEnvGoal(setTrackingEnv2):
             reward, reward_dict, done, mean_nlogdetcov = self.get_reward(observed, self.is_training)
 
             mean_reward += reward
-            mean_reward_dict += (reward_dict + self.coverage_reward_factor*coverage_reward)
-
+            mean_reward_dict += (reward_dict + self.coverage_reward_factor * coverage_reward)
 
             if not self.is_training:
                 mean_mean_logdetcov += mean_nlogdetcov
+
 
         mean_reward /= (int(self.dT/self.sampling_period))
         mean_reward_dict = mean_reward_dict / (int(self.dT/self.sampling_period))
