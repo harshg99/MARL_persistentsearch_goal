@@ -2,8 +2,20 @@ import numpy as np
 import envs
 import torch
 
+class CostFunctions:
+    @staticmethod
+    def nearest_target(target_id, agent):
+        target_rel_pos = agent.belief[target_id].state[:2] - agent.state[:2]
+        return np.linalg.norm(target_rel_pos), target_rel_pos
+
+    @staticmethod
+    def nearest_unc_target(target_id, agent):
+        target_rel_pos = agent.belief[target_id].state[:2] - agent.state[:2]
+        return np.linalg.norm(target_rel_pos) + 1 / np.clip(np.linalg.norm(agent.belief[target_id].cov[:2, :2]),0.001), target_rel_pos
+
 class GreedyAgent:
-    def __init__(self):
+    def __init__(self,cost_function=CostFunctions.nearest_target):
+        self.cost_function = cost_function
         pass
 
     def act(self, agent, avail_actions):
@@ -13,9 +25,9 @@ class GreedyAgent:
         nearest_pos = np.array([np.inf,np.inf])
         nearest_dist = np.inf
         for i in range(len(agent.belief)):
-            target_rel_pos = agent.belief[i].state[:2] - agent.state[:2]
-            if nearest_dist > np.linalg.norm(target_rel_pos):
-                nearest_dist = np.linalg.norm(target_rel_pos)
+            cost,target_rel_pos = self.cost_function(i, agent)
+            if cost < nearest_dist:
+                nearest_dist = cost
                 nearest_pos = target_rel_pos
 
         nearest_dist_action = np.inf
@@ -40,9 +52,9 @@ class GreedyAgent:
             return action
 
 class GreedyAssignedAgent:
-    def __init__(self, num_targets):
+    def __init__(self, num_targets, cost_function=CostFunctions.nearest_target):
         self.assigned_targets = {j: False for j in range(num_targets)}
-
+        self.cost_function = cost_function
     def reset(self):
         self.assigned_targets = {j: False for j in range(len(self.assigned_targets))}
 
@@ -54,9 +66,9 @@ class GreedyAssignedAgent:
         nearest_dist = np.inf
         target_selected =  -1
         for i in range(len(agent.belief)):
-            target_rel_pos = agent.belief[i].state[:2] - agent.state[:2]
-            if nearest_dist > np.linalg.norm(target_rel_pos) and not self.assigned_targets[i]:
-                nearest_dist = np.linalg.norm(target_rel_pos)
+            cost,target_rel_pos = self.cost_function(i, agent)
+            if nearest_dist > cost and not self.assigned_targets[i]:
+                nearest_dist = cost
                 nearest_pos = target_rel_pos
                 target_selected = i
 
@@ -152,6 +164,7 @@ def parse_args():
     parser.add_argument('--log_dir', type=str, default='./results/runs')
     parser.add_argument('--log_fname', type=str, default='last_model.pt')
     parser.add_argument('--repeat', type=int, default=1)
+    parser.add_argument('--cost_func', type=str, default='nearest_target') # nearest_target, nearest_unc_target
 
 
     parser.add_argument("--reward_type", type=str , default='Mean',
@@ -199,7 +212,7 @@ if __name__ =="__main__":
                     'ma_target_tracking',
                     render = bool(args.render),
                     record = bool(args.record),
-                    directory = args.log_dir +"/"+args.policy,
+                    directory = args.log_dir +"/"+args.policy +"/"+args.cost_func,
                     map_name = args.map,
                     num_agents = args.nb_agents,
                     num_targets = args.nb_targets,
@@ -217,7 +230,8 @@ if __name__ =="__main__":
     elif args.policy == 'Random':
         policy = RandomAgent()
     elif args.policy == 'GreedyAssigned':
-        policy = GreedyAssignedAgent(num_targets = args.nb_targets)
+        cost_func = getattr(CostFunctions, args.cost_func)
+        policy = GreedyAssignedAgent(num_targets = args.nb_targets, cost_function=cost_func)
 
     run_episode(env, args, policy)
 
