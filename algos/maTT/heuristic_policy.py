@@ -17,6 +17,7 @@ class CostFunctions:
 class GreedyAgent:
     def __init__(self,cost_function=CostFunctions.nearest_target):
         self.cost_function = cost_function
+        self.type = 'dec'
         pass
 
     def act(self, agent, avail_actions):
@@ -56,6 +57,8 @@ class GreedyAssignedAgent:
     def __init__(self, num_targets, cost_function=CostFunctions.nearest_target):
         self.assigned_targets = {j: False for j in range(num_targets)}
         self.cost_function = cost_function
+        self.type = 'dec'
+
     def reset(self):
         self.assigned_targets = {j: False for j in range(len(self.assigned_targets))}
 
@@ -97,7 +100,10 @@ class GreedyAssignedAgent:
             return action
 
 class MinMaxAgent:
-    def __init__(self):
+    def __init__(self, num_targets, cost_function=CostFunctions.nearest_target):
+        self.num_targets = num_targets
+        self.cost_function = cost_function
+        self.type = 'cen'
         pass
 
     def act(self, agent, avail_actions):
