@@ -67,7 +67,7 @@ class setTrackingEnvGoal(setTrackingEnv2):
         if not self.step_goal:
             self.sampling_period = METADATA['sampling_period']
         else:
-            self.sampling_period = self.dT
+            self.sampling_period = METADATA['sampling_period']
 
         # LIMIT
         self.limit = {}  # 0: low, 1:highs
@@ -300,13 +300,16 @@ class setTrackingEnvGoal(setTrackingEnv2):
                     mean_mean_logdetcov += mean_nlogdetcov
         else:
             # update target
-            for i in range(self.nb_targets):
-                # update target
-                self.targets[i].update()  # self.targets[i].reset(np.concatenate((init_pose['targets'][i][:2], self.target_init_vel)))
-                for j in range(self.nb_agents):
-                    self.agents[j].belief[i].predict()
 
-                self.belief_targets[i].predict()  # Belief state at t+1
+            for j in range((int(self.dT / self.sampling_period))):
+                for i in range(self.nb_targets):
+                    # update target
+                    self.targets[
+                        i].update()  # self.targets[i].reset(np.concatenate((init_pose['targets'][i][:2], self.target_init_vel)))
+                    for j in range(self.nb_agents):
+                        self.agents[j].belief[i].predict()
+
+                    self.belief_targets[i].predict()  # Belief state at t+1
                 # Target and map observations
             observed = np.zeros((self.nb_agents, self.nb_targets), dtype=bool)
 

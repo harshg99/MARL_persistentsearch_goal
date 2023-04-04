@@ -19,20 +19,106 @@ class GreedyAgent:
                 nearest_pos = target_rel_pos
 
         nearest_dist_action = np.inf
-        action_index = 0
+        action_index = -1
         selected_action = -1
         global_yaw = np.arctan2(nearest_pos[1], nearest_pos[0]) + np.pi
         global_yaw_dis = int(global_yaw / (np.pi/2))*np.pi/2
         for action in avail_actions:
             if np.linalg.norm(nearest_pos - avail_actions[action][:2]) <= nearest_dist_action:
                 action_index = action
-                if avail_actions[action][2] == global_yaw_dis:
+                nearest_dist_action = np.linalg.norm(nearest_pos - avail_actions[action][:2])
+                if abs(avail_actions[action][2] - global_yaw_dis) < 0.02:
                     selected_action = action
 
         if selected_action != -1:
             return selected_action
-        else:
+        elif action_index != -1:
             return action_index
+        else:
+            # Return greefy if nothing works
+            action = np.random.choice(list(avail_actions.keys()), size=1).item()
+            return action
+
+class GreedyAssignedAgent:
+    def __init__(self, num_targets):
+        self.assigned_targets = {j: False for j in range(num_targets)}
+
+    def reset(self):
+        self.assigned_targets = {j: False for j in range(len(self.assigned_targets))}
+
+    def act(self, agent, avail_actions):
+        # Gets the nearest expected relative position of the target and selects the action which takes it the closest
+        # Avail actions is a dictionary with a list of available action and what they do : goal setting , velocity setting#
+        # Nearest target
+        nearest_pos = np.array([np.inf,np.inf])
+        nearest_dist = np.inf
+        target_selected =  -1
+        for i in range(len(agent.belief)):
+            target_rel_pos = agent.belief[i].state[:2] - agent.state[:2]
+            if nearest_dist > np.linalg.norm(target_rel_pos) and not self.assigned_targets[i]:
+                nearest_dist = np.linalg.norm(target_rel_pos)
+                nearest_pos = target_rel_pos
+                target_selected = i
+
+        self.assigned_targets[target_selected] = True
+
+        nearest_dist_action = np.inf
+        action_index = -1
+        selected_action = -1
+        global_yaw = np.arctan2(nearest_pos[1], nearest_pos[0]) + np.pi
+        global_yaw_dis = int(global_yaw / (np.pi/2))*np.pi/2
+        for action in avail_actions:
+            if np.linalg.norm(nearest_pos - avail_actions[action][:2]) <= nearest_dist_action:
+                action_index = action
+                nearest_dist_action = np.linalg.norm(nearest_pos - avail_actions[action][:2])
+                if abs(avail_actions[action][2] - global_yaw_dis) < 0.02:
+                    selected_action = action
+
+        if selected_action != -1:
+            return selected_action
+        elif action_index != -1:
+            return action_index
+        else:
+            # Return greefy if nothing works
+            action = np.random.choice(list(avail_actions.keys()), size=1).item()
+            return action
+
+class MinMaxAgent:
+    def __init__(self):
+        pass
+
+    def act(self, agent, avail_actions):
+        # Gets the nearest expected relative position of the target and selects the action which takes it the closest
+        # Avail actions is a dictionary with a list of available action and what they do : goal setting , velocity setting#
+        # Nearest target
+        nearest_pos = np.array([np.inf,np.inf])
+        nearest_dist = np.inf
+        for i in range(len(agent.belief)):
+            target_rel_pos = agent.belief[i].state[:2] - agent.state[:2]
+            if nearest_dist > np.linalg.norm(target_rel_pos):
+                nearest_dist = np.linalg.norm(target_rel_pos)
+                nearest_pos = target_rel_pos
+
+        nearest_dist_action = np.inf
+        action_index = -1
+        selected_action = -1
+        global_yaw = np.arctan2(nearest_pos[1], nearest_pos[0]) + np.pi
+        global_yaw_dis = int(global_yaw / (np.pi/2))*np.pi/2
+        for action in avail_actions:
+            if np.linalg.norm(nearest_pos - avail_actions[action][:2]) <= nearest_dist_action:
+                action_index = action
+                nearest_dist_action = np.linalg.norm(nearest_pos - avail_actions[action][:2])
+                if abs(avail_actions[action][2] - global_yaw_dis) < 0.02:
+                    selected_action = action
+
+        if selected_action != -1:
+            return selected_action
+        elif action_index != -1:
+            return action_index
+        else:
+            # Return greefy if nothing works
+            action = np.random.choice(list(avail_actions.keys()), size=1).item()
+            return action
 
 class RandomAgent:
     def __init__(self):
@@ -94,7 +180,8 @@ def run_episode(env, args, policy):
             agent_keys = env.envs[i].observation_space.keys()
             for j, key in enumerate(agent_keys):
                 action_dict[i][key] = policy.act(agents[j], action_map)
-
+        if hasattr(policy, "reset"):
+            policy.reset()
         if args.render:
             env.envs[0].render()
         # TRY NOT TO MODIFY: execute the game and log data.
@@ -129,6 +216,8 @@ if __name__ =="__main__":
         policy = GreedyAgent()
     elif args.policy == 'Random':
         policy = RandomAgent()
+    elif args.policy == 'GreedyAssigned':
+        policy = GreedyAssignedAgent(num_targets = args.nb_targets)
 
     run_episode(env, args, policy)
 
