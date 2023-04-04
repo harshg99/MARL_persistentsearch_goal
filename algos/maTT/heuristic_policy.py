@@ -11,7 +11,8 @@ class CostFunctions:
     @staticmethod
     def nearest_unc_target(target_id, agent):
         target_rel_pos = agent.belief[target_id].state[:2] - agent.state[:2]
-        return np.linalg.norm(target_rel_pos) + 1 / np.clip(np.linalg.norm(agent.belief[target_id].cov[:2, :2]),0.001), target_rel_pos
+        return np.linalg.norm(target_rel_pos) + \
+               1 / np.clip(np.linalg.norm(agent.belief[target_id].cov[:2, :2]),0.001,np.inf), target_rel_pos
 
 class GreedyAgent:
     def __init__(self,cost_function=CostFunctions.nearest_target):
@@ -208,6 +209,10 @@ def run_episode(env, args, policy):
 
 if __name__ =="__main__":
     args = parse_args()
+    import os
+    if not os.path.exists(args.log_dir +"/"+args.policy +"/"+args.cost_func):
+        os.makedirs(args.log_dir +"/"+args.policy +"/"+args.cost_func)
+
     env = envs.make(args.env,
                     'ma_target_tracking',
                     render = bool(args.render),
