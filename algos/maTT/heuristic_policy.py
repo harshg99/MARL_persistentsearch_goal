@@ -12,7 +12,7 @@ class CostFunctions:
     def nearest_unc_target(target_id, agent):
         target_rel_pos = agent.belief[target_id].state[:2] - agent.state[:2]
         return np.linalg.norm(target_rel_pos) + \
-               1 / np.clip(np.linalg.norm(agent.belief[target_id].cov[:2, :2]),0.001,np.inf), target_rel_pos
+               1 / np.clip(np.linalg.norm(agent.belief[target_id].cov[:2, :2]),0.01,np.inf), target_rel_pos
 
 class GreedyAgent:
     def __init__(self,cost_function=CostFunctions.nearest_target):
@@ -106,12 +106,14 @@ class MinMaxAgent:
         self.type = 'cen'
         pass
 
-    def act(self, agent, avail_actions):
+    def act(self, agent, avail_actions, agent_keys):
         # Gets the nearest expected relative position of the target and selects the action which takes it the closest
         # Avail actions is a dictionary with a list of available action and what they do : goal setting , velocity setting#
         # Nearest target
         nearest_pos = np.array([np.inf,np.inf])
         nearest_dist = np.inf
+
+
         for i in range(len(agent.belief)):
             target_rel_pos = agent.belief[i].state[:2] - agent.state[:2]
             if nearest_dist > np.linalg.norm(target_rel_pos):
@@ -198,8 +200,11 @@ def run_episode(env, args, policy):
             agents = env.envs[i].agents
             action_map = env.envs[i].action_map
             agent_keys = env.envs[i].observation_space.keys()
-            for j, key in enumerate(agent_keys):
-                action_dict[i][key] = policy.act(agents[j], action_map)
+            if policy.type == 'cen':
+                action_dict[i] = policy.act(agents, action_map, agent_keys)
+            else:
+                for j, key in enumerate(agent_keys):
+                    action_dict[i][key] = policy.act(agents[j], action_map)
         if hasattr(policy, "reset"):
             policy.reset()
         if args.render:
