@@ -413,7 +413,14 @@ class setTrackingEnvGoal(setTrackingEnv2):
 
         globaldetcov = np.ravel(globaldetcov)
 
-        r_detcov_sum = - np.sum(np.log(globaldetcov))
+        norm = None
+        for b_target in belief_targets:
+            norm = np.ravel([np.log(b_target.cov_limit)])
+
+        if norm is not None:
+            r_detcov_sum = - np.mean(np.log(globaldetcov))
+        else:
+            r_detcov_sum = - np.mean(np.log(globaldetcov)/norm)
         reward = c_mean * r_detcov_sum
 
         ## discretize grid
@@ -428,9 +435,18 @@ class setTrackingEnvGoal(setTrackingEnv2):
         if self.reward_type == "Max":
             for id, agent in enumerate(self.agents):
                 detcov = [LA.det(b.cov) for b in agent.belief]
+
+                norm = None
+                for b_target in agent.belief:
+                    norm = np.ravel([np.log(b_target.cov_limit)])
+
                 detcov = np.ravel(detcov)
+
                 if is_training:
-                    detcov_max = - c_mean*np.log(np.max(detcov))
+                    if norm is not None:
+                        detcov_max = - c_mean*np.log(np.max(detcov))
+                    else:
+                        detcov_max = - c_mean*np.log(np.max(detcov) / np.max(norm))
                     # print("centralized")
                 else:
                     detcov_max = - c_mean*np.log(np.max(detcov))
@@ -440,7 +456,16 @@ class setTrackingEnvGoal(setTrackingEnv2):
             for id, agent in enumerate(self.agents):
                 detcov = [LA.det(b.cov) for b in agent.belief]
                 detcov = np.ravel(detcov)
-                detcov_max = - c_mean * np.log(detcov).mean()
+
+                norm = None
+                for b_target in agent.belief:
+                    norm = np.ravel([np.log(b_target.cov_limit)])
+
+                if norm is not None:
+                    detcov_max = - c_mean * (np.log(detcov)/norm).mean()
+                else:
+                    detcov_max = - c_mean * np.log(detcov).mean()
+
                 reward_dict.append( detcov_max)
 
         mean_nlogdetcov = None

@@ -110,7 +110,8 @@ class setTrackingEnv2(maTrackingBase):
         self.belief_targets = [KFbelief(agent_id = 'target-' + str(i),
                         dim=self.target_dim, limit=self.limit['target'], A=self.targetA,
                         W=self.target_noise_cov, obs_noise_func=self.observation_noise,
-                        collision_func=lambda x: map_utils.is_collision(self.MAP, x))
+                        collision_func=lambda x: map_utils.is_collision(self.MAP, x),
+                        cov_limit = 1e6)
                         for i in range(self.num_targets)]
         # Initialise individual target beliefs for each agent
 
