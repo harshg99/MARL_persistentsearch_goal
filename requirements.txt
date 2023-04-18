@@ -113,7 +113,6 @@ protobuf==3.20.3
 psutil==5.8.0
 pyasn1==0.4.8
 pyasn1-modules
-pycuda
 pyglet==1.5.21
 pyparsing==3.0.7
 pyrsistent==0.18.1
