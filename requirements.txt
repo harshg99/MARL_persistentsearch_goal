@@ -130,7 +130,7 @@ nvidia-cuda-nvcc-cu11==11.8.89
 nvidia-cuda-runtime-cu11==11.8.89
 nvidia-cudnn-cu11==8.9.0.131
 oauthlib==3.2.0
-onnx @ file:///croot/onnx_1675284251553/work
+onnx
 onnxruntime==1.14.1
 opax==0.2.11
 opencv-python==4.6.0.66
@@ -144,7 +144,6 @@ pax3==0.5.9
 pcg-gazebo==0.7.12
 Pillow==9.3.0
 pkgutil_resolve_name==1.3.10
-platformdirs @ file:///home/conda/feedstock_root/build_artifacts/platformdirs_1672264874562/work
 pluggy==1.0.0
 progress==1.6
 progressbar2==3.53.1
@@ -156,7 +155,7 @@ pyasn1==0.4.8
 pyasn1-modules==0.2.8
 pycollada==0.6
 pycparser==2.21
-pycuda @ file:///home/conda/feedstock_root/build_artifacts/pycuda_1671610235141/work
+pycuda
 pyglet==1.5.21
 Pygments==2.14.0
 PyJWT==2.3.0
@@ -169,7 +168,7 @@ python-fcl==0.6.1
 python-qt-binding==0.4.4
 python-utils==3.3.3
 pytoml==0.1.21
-pytools @ file:///home/conda/feedstock_root/build_artifacts/pytools_1672119551522/work
+pytools
 pytz==2022.1
 PyWavelets==1.3.0
 PyYAML==5.4.1
@@ -177,7 +176,6 @@ qdldl==0.1.5.post0
 qt-gui==0.4.2
 ray==1.9.2
 redis==4.1.2
-reeds-shepp @ git+https://git@github.com/ghliu/pyReedsShepp@69aebbb6ad98f38b60e192999a7302d3b74bb7ad
 requests==2.28.2
 requests-oauthlib==1.3.1
 resource_retriever==1.12.7
@@ -214,13 +212,11 @@ Send2Trash==1.8.0
 sensor-msgs==1.13.1
 Shapely==1.7.0
 simplejson==3.17.6
-six @ file:///tmp/build/80754af9/six_1644875935023/work
 smach==2.5.0
 smach-ros==2.5.0
 smclib==1.8.6
 smmap==5.0.0
 sniffio==1.3.0
-sobol-seq @ git+https://git@github.com/naught101/sobol_seq@8f819b68f64e1fea4999f5c64b73823a019fb244
 soupsieve==2.4
 stable-baselines3==1.5.0
 sumolib==1.12.0
