@@ -3,7 +3,6 @@ actionlib==1.14.0
 ale-py==0.7.5
 angles==1.9.13
 anyio==3.6.2
-appdirs @ file:///home/conda/feedstock_root/build_artifacts/appdirs_1603108395799/work
 argon2-cffi==21.3.0
 argon2-cffi-bindings==21.2.0
 arrow==1.2.2
@@ -48,7 +47,6 @@ filelock==3.4.2
 filterpy==1.4.5
 fire==0.4.0
 flatbuffers==23.3.3
-flit_core @ file:///opt/conda/conda-bld/flit-core_1644941570762/work/source/flit_core
 fonttools==4.29.1
 fqdn==1.5.1
 future==0.18.2
@@ -99,18 +97,14 @@ laser_geometry==1.6.7
 librosa==0.4.2
 llvmlite==0.38.1
 lxml==4.8.0
-Mako @ file:///home/conda/feedstock_root/build_artifacts/mako_1668568582731/work
 Markdown==3.3.6
-MarkupSafe @ file:///home/conda/feedstock_root/build_artifacts/markupsafe_1674135809652/work
 matplotlib==3.5.1
 mctx==0.0.2
 message-filters==1.15.15
 mistune==2.0.5
 mkl-fft==1.3.1
-mkl-random @ file:///tmp/build/80754af9/mkl_random_1626186064646/work
 mkl-service==2.4.0
 monotonic==1.6
--e git+https://github.com/ljarin/motion_primitives.git@d40bf92e4cd9571c442f169d8fea993c15b09a01#egg=motion_primitives_py&subdirectory=motion_primitives_py
 mpi4py==3.1.4
 mpmath==1.2.1
 msgpack==1.0.3
