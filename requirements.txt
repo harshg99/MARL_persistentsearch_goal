@@ -21,7 +21,6 @@ chex==0.1.4
 click==8.0.3
 cloudpickle==1.6.0
 cmaes==0.8.2
-colabcode==0.3.0
 coloredlogs==15.0.1
 colorlog==6.6.0
 cupy-cuda11x==11.4.0
