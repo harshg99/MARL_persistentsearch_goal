@@ -417,7 +417,7 @@ class setTrackingEnvGoal(setTrackingEnv2):
         for b_target in belief_targets:
             norm = np.ravel([np.log(b_target.cov_limit)])
 
-        if norm is not None:
+        if norm is None:
             r_detcov_sum = - np.mean(np.log(globaldetcov))
         else:
             r_detcov_sum = - np.mean(np.log(globaldetcov)/norm)
@@ -443,7 +443,7 @@ class setTrackingEnvGoal(setTrackingEnv2):
                 detcov = np.ravel(detcov)
 
                 if is_training:
-                    if norm is not None:
+                    if norm is None:
                         detcov_max = - c_mean*np.log(np.max(detcov))
                     else:
                         detcov_max = - c_mean*np.log(np.max(detcov) / np.max(norm))
