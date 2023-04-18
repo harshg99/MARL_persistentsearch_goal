@@ -48,8 +48,4 @@ RUN sudo apt-get update \
     && sudo rosdep init \
     && rosdep update
 
-
-
 RUN conda init
-
-WORKDIR /home
