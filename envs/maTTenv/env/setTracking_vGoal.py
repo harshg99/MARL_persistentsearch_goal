@@ -190,7 +190,8 @@ class setTrackingEnvGoal(setTrackingEnv2):
         done_dict['__all__'], info_dict['mean_nlogdetcov'] = done, mean_logdetcov
 
         info_dict['reward_all'] = reward_dict
-        info_dict['metrics'] = [self.calculate_total_uncertainity(), self.calculate_max_uncertainity()]
+        info_dict['metrics'] = [self.calculate_total_uncertainity(),self.calculate_max_global_uncertainity(),
+                                self.calculate_max_uncertainity_agent(), self.calculate_var_unc_agent()]
         self.steps += 1
         return obs_dict, reward, done, info_dict
 
@@ -402,6 +403,65 @@ class setTrackingEnvGoal(setTrackingEnv2):
             # sensor_footprint = union_rectangles(rectangles)
 
         return coverage_rew_dict
+
+    def calculate_total_uncertainity(self):
+        """
+        Calculating metric
+        - sum(tr(cov) over all beliefs)
+        uncertainty in the global beleifs - global metric
+
+        """
+        total_uncertainity = 0
+
+        for belief in self.belief_targets:
+            total_uncertainity += np.log(np.sum(np.diag(belief.cov)[:2]))
+
+        return total_uncertainity
+
+    def calculate_max_global_uncertainity(self):
+        """
+        Calculating metric
+        - max(tr(cov)) over all beliefs)
+        uncertainty in the global beleifs - global metric
+
+        """
+        max_uncertainity = -1e10
+
+        for belief in self.belief_targets:
+            if max_uncertainity < np.log(np.sum(np.diag(belief.cov)[:2])):
+                max_uncertainity = np.log(np.sum(np.diag(belief.cov)[:2]))
+
+        return max_uncertainity
+
+    def calculate_max_uncertainity_agent(self):
+        """
+        Calculating metric
+        - sum(max(tr(cov)) over targets)
+
+        """
+        max_uncertainity = [-1e10 for _ in range(self.nb_targets)]
+        for agent in self.agents:
+            for i, b_target in enumerate(agent.belief):
+                uncertainity = np.log(np.sum(np.diag(b_target.cov)[:2]))
+                if max_uncertainity[i] < uncertainity:
+                    max_uncertainity[i] = uncertainity
+
+        return sum(max_uncertainity)
+
+    def calculate_var_unc_agent(self):
+        '''
+        Computes how much do the uncertainty estimates for each target differ across each agent
+        :return:
+        '''
+        var_unc = np.zeros(len(self.agents),self.nb_targets)
+        for j,agent in enumerate(self.agents):
+            for i, b_target in enumerate(agent.belief):
+                var_unc[j,i] = np.log(np.sum(np.diag(b_target.cov)[:2]))
+
+        variances = np.sum(np.var(var_unc,axis=-1))
+        return variances.item()
+
+
 
     def get_reward(self, observed=None, is_training=True):
         return self.reward_fun(self.agents, self.nb_targets, self.belief_targets, is_training, c_mean=0.1,

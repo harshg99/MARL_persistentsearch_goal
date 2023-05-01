@@ -98,7 +98,7 @@ def decentralized_ppo(envs, model, args, run_name, notes=None):
     logprobs = torch.zeros((args.num_steps, args.num_envs, args.nb_agents)).to(device)
 
     rewards = torch.zeros((args.num_steps, args.num_envs,args.nb_agents)).to(device)
-    metrics = torch.zeros((args.num_steps, args.num_envs, 2)).to(device)
+    metrics = torch.zeros((args.num_steps, args.num_envs, 4)).to(device)
 
     dones = torch.zeros((args.num_steps, args.num_envs)).to(device)
     values = torch.zeros((args.num_steps, args.num_envs, args.nb_agents)).to(device)
@@ -149,13 +149,17 @@ def decentralized_ppo(envs, model, args, run_name, notes=None):
                 # from IPython import embed; embed()
                 for env_i in range(args.num_envs):
                     print(f"global_step={global_step}, episodic_return_env={env_i}={torch.sum(rewards[step - ep_length:step, env_i],dim=0).item()}")
-                writer.add_scalar(f"charts/episodic_return_env", torch.sum(rewards[step - ep_length:step, :],
+                writer.add_scalar(f"charts/episodic_return_env", torch.mean(rewards[step - ep_length:step, :],
                                                                            dim=0).mean().item(), global_step)
-                writer.add_scalar(f"evaluation_total_uncertainty_env", torch.sum(metrics[step - ep_length:step,:, 0],
+                writer.add_scalar(f"evaluation_total_uncertainty_env", torch.mean(metrics[step - ep_length:step,:, 0],
                                                                                   dim = 0).mean().item(), global_step)
-                writer.add_scalar(f"evaluation_max_uncertainty_env", torch.sum(metrics[step - ep_length:step, :, 1],
+                writer.add_scalar(f"evaluation_max_uncertainty_env_global", torch.mean(metrics[step - ep_length:step, :, 1],
                                                                                 dim = 0).mean().item(), global_step)
-                    
+
+                writer.add_scalar(f"evaluation_max_uncertainty_env_agent", torch.mean(metrics[step - ep_length:step, :, 1],
+                                                                                dim=0).mean().item(), global_step)
+                writer.add_scalar(f"evaluation_var_uncertainty_env_agent", torch.mean(metrics[step - ep_length:step, :, 1],
+                                                                                dim=0).mean().item(), global_step)
                 writer.add_scalar("charts/episodic_length", ep_length, global_step)
                 
                 ep_length = 0
