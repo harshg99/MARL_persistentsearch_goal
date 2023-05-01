@@ -148,10 +148,13 @@ def decentralized_ppo(envs, model, args, run_name, notes=None):
             if torch.sum(next_done).item() == args.num_envs:
                 # from IPython import embed; embed()
                 for env_i in range(args.num_envs):
-                    print(f"global_step={global_step}, episodic_return_env={env_i}={torch.sum(rewards[step - ep_length:step, env_i]).item()}")
-                    writer.add_scalar(f"charts/episodic_return_env_{env_i}", torch.sum(rewards[step - ep_length:step, env_i]).item(), global_step)
-                    writer.add_scalar(f"evaluation_total_uncertainity_env_{env_i}", torch.sum(metrics[step - ep_length:step, env_i, 0]).item(), global_step)
-                    writer.add_scalar(f"evaluation_max_uncertainity_env_{env_i}", torch.sum(metrics[step - ep_length:step, env_i, 1]).item(), global_step)
+                    print(f"global_step={global_step}, episodic_return_env={env_i}={torch.sum(rewards[step - ep_length:step, env_i],dim=0).item()}")
+                writer.add_scalar(f"charts/episodic_return_env", torch.sum(rewards[step - ep_length:step, :],
+                                                                           dim=0).mean().item(), global_step)
+                writer.add_scalar(f"evaluation_total_uncertainty_env", torch.sum(metrics[step - ep_length:step,:, 0],
+                                                                                  dim = 0).mean().item(), global_step)
+                writer.add_scalar(f"evaluation_max_uncertainty_env", torch.sum(metrics[step - ep_length:step, :, 1],
+                                                                                dim = 0).mean().item(), global_step)
                     
                 writer.add_scalar("charts/episodic_length", ep_length, global_step)
                 
