@@ -453,7 +453,7 @@ class setTrackingEnvGoal(setTrackingEnv2):
         Computes how much do the uncertainty estimates for each target differ across each agent
         :return:
         '''
-        var_unc = np.zeros(len(self.agents),self.nb_targets)
+        var_unc = np.zeros((len(self.agents),self.nb_targets))
         for j,agent in enumerate(self.agents):
             for i, b_target in enumerate(agent.belief):
                 var_unc[j,i] = np.log(np.sum(np.diag(b_target.cov)[:2]))
