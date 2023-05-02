@@ -156,9 +156,9 @@ def decentralized_ppo(envs, model, args, run_name, notes=None):
                 writer.add_scalar(f"evaluation_max_uncertainty_env_global", torch.mean(metrics[step - ep_length:step, :, 1],
                                                                                 dim = 0).mean().item(), global_step)
 
-                writer.add_scalar(f"evaluation_max_uncertainty_env_agent", torch.mean(metrics[step - ep_length:step, :, 1],
+                writer.add_scalar(f"evaluation_max_uncertainty_env_agent", torch.mean(metrics[step - ep_length:step, :, 2],
                                                                                 dim=0).mean().item(), global_step)
-                writer.add_scalar(f"evaluation_var_uncertainty_env_agent", torch.mean(metrics[step - ep_length:step, :, 1],
+                writer.add_scalar(f"evaluation_var_uncertainty_env_agent", torch.mean(metrics[step - ep_length:step, :, 3],
                                                                                 dim=0).mean().item(), global_step)
                 writer.add_scalar("charts/episodic_length", ep_length, global_step)
                 
