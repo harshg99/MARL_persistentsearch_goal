@@ -175,7 +175,7 @@ def parse_args():
     parser.add_argument('--repeat', type=int, default=1)
     parser.add_argument('--cost_func', type=str, default='nearest_target') # nearest_target, nearest_unc_target
 
-
+    parser.add_argument('--trials', type=int, default=20)
     parser.add_argument("--reward_type", type=str , default='Mean',
                         help="type of reward structure")
 
@@ -185,10 +185,11 @@ def run_episode(env, args, policy):
 
     obs = env.reset()
     global_step = 0
-    rewards = np.zeros(shape = (args.num_steps,args.nb_agents))
-    dones = np.zeros(shape = (args.num_steps))
+    rewards = np.zeros(shape = (args.num_steps, args.num_envs, args.nb_agents))
+    dones = np.zeros(shape = (args.num_steps, args.num_envs))
     ep_length = 0
     next_done = False
+    metrics = np.zeros(shape = (args.num_steps, args.num_envs, 4))
     for step in range(0, args.num_steps):
         global_step += 1
 
@@ -211,12 +212,17 @@ def run_episode(env, args, policy):
             env.envs[0].render()
         # TRY NOT TO MODIFY: execute the game and log data.
         next_obs, reward, done, info = env.step(action_dict)
-        rewards[step, :] = reward
+        if "reward_all" in info:
+            rewards[step] = np.stack(info['reward_all'])
+
+        metrics[step] = np.stack([inf['metrics'] for inf in info])
         dones[step] = done
         next_done = done
         print("Progress {}".format(step))
 
-    print( "Episode Rewards : {}".format(np.sum(rewards)))
+    mean_rewards  = np.mean(rewards,axis = 0).mean()
+    mean_metrics = np.mean(metrics,axis = 0).mean(axis = 0)
+    return mean_rewards, mean_metrics
 
 if __name__ =="__main__":
     args = parse_args()
@@ -249,5 +255,18 @@ if __name__ =="__main__":
         cost_func = getattr(CostFunctions, args.cost_func)
         policy = GreedyAssignedAgent(num_targets = args.nb_targets, cost_function=cost_func)
 
-    run_episode(env, args, policy)
+    rewards = np.zeros(shape = (args.trials))
+    metrics = np.zeros(shape = (args.trials,4))
+    for j in range(args.trials):
+        r,m =  run_episode(env, args, policy)
+        rewards[j] = r
+        metrics[j] = m
 
+
+    print("Mean Reward {} ".format(np.mean(rewards),np.mean(metrics,axis = 0)))
+    print("Std Reward {} ".format(np.std(rewards),np.std(metrics,axis = 0)))
+
+    print("Evaluation total uncertainty env {}".format(np.mean(metrics,axis = 0)[0]))
+    print("Evaluation max uncertainty global {}".format(np.mean(metrics,axis = 0)[1]))
+    print("Evaluation max uncertainty agent {}".format(np.mean(metrics,axis = 0)[2]))
+    print("Evaluation variance uncertainty agent  {}".format(np.mean(metrics,axis = 0)[3]))
