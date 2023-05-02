@@ -148,7 +148,7 @@ def decentralized_ppo(envs, model, args, run_name, notes=None):
             if torch.sum(next_done).item() == args.num_envs:
                 # from IPython import embed; embed()
                 for env_i in range(args.num_envs):
-                    print(f"global_step={global_step}, episodic_return_env={env_i}={torch.sum(rewards[step - ep_length:step, env_i],dim=0).item()}")
+                    print(f"global_step={global_step}, episodic_return_env={env_i}={torch.sum(rewards[step - ep_length:step, env_i]).item()}")
                 writer.add_scalar(f"charts/episodic_return_env", torch.mean(rewards[step - ep_length:step, :],
                                                                            dim=0).mean().item(), global_step)
                 writer.add_scalar(f"evaluation_total_uncertainty_env", torch.mean(metrics[step - ep_length:step,:, 0],
