@@ -1,7 +1,7 @@
 import numpy as np
 import envs
 import torch
-
+from tqdm import tqdm
 class CostFunctions:
     @staticmethod
     def nearest_target(target_id, agent):
@@ -190,7 +190,7 @@ def run_episode(env, args, policy):
     ep_length = 0
     next_done = False
     metrics = np.zeros(shape = (args.num_steps, args.num_envs, 4))
-    for step in range(0, args.num_steps):
+    for step in tqdm(range(0, args.num_steps)):
         global_step += 1
 
         dones[step] = next_done  # dones[step] = next_done
@@ -218,7 +218,7 @@ def run_episode(env, args, policy):
         metrics[step] = np.stack([inf['metrics'] for inf in info])
         dones[step] = done
         next_done = done
-        print("Progress {}".format(step))
+        #print("Progress {}".format(step))
 
     mean_rewards  = np.mean(rewards,axis = 0).mean()
     mean_metrics = np.mean(metrics,axis = 0).mean(axis = 0)
