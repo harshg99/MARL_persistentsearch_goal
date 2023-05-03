@@ -1,9 +1,10 @@
 from envs.utilities.ma_time_limit import maTimeLimit, maTimeLimitVec
 import gym
 from stable_baselines3.common.env_util import make_vec_env
-
+from stable_baselines3.common.vec_env import SubprocVecEnv
+from stable_baselines3.common.vec_env import DummyVecEnv
 def make(env_name, render=False, figID=0, record=False, directory='',
-                    T_steps=None, num_agents=2, num_targets=1, **kwargs):
+                    T_steps=None, num_agents=2, num_targets=1, test = False, **kwargs):
     """
     env_name : str
         name of an environment. (e.g. 'Cartpole-v0')
@@ -48,11 +49,13 @@ def make(env_name, render=False, figID=0, record=False, directory='',
         from envs.maTTenv.display_wrapper import Video2D
         env = Video2D(env, dirname = directory)
     
-    if render:
+    if render or test:
         env = make_vec_env(lambda: env, n_envs=kwargs["num_envs"], vec_env_cls=gym.vector.SyncVectorEnv)
+        #env = make_vec_env(lambda: env, n_envs=kwargs["num_envs"], vec_env_cls=DummyVecEnv)
         env = maTimeLimitVec(env, max_episode_steps=T_steps)
     elif "num_envs" in kwargs and kwargs["num_envs"] > 1:
         env = make_vec_env(lambda: env, n_envs=kwargs["num_envs"], vec_env_cls=gym.vector.AsyncVectorEnv)
+        #env = make_vec_env(lambda: env, n_envs=kwargs["num_envs"], vec_env_cls=SubprocVecEnv)
         env = maTimeLimitVec(env, max_episode_steps=T_steps)
     else:
         env = make_vec_env(lambda: env, n_envs=1, vec_env_cls=gym.vector.SyncVectorEnv)
