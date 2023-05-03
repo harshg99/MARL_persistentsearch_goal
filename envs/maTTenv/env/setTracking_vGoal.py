@@ -476,7 +476,8 @@ class setTrackingEnvGoal(setTrackingEnv2):
 
         norm = None
         for b_target in belief_targets:
-            norm = np.ravel([np.log(b_target.cov_limit)])
+            if b_target.cov_limit is not None:
+                norm = np.ravel([np.log(b_target.cov_limit)])
 
         if norm is None:
             r_detcov_sum = - np.mean(np.log(globaldetcov))
@@ -509,12 +510,12 @@ class setTrackingEnvGoal(setTrackingEnv2):
 
                 if is_training:
                     if norm is None:
-                        detcov_max = - c_mean*np.log(np.max(detcov))
+                        detcov_max = - c_mean*np.max(np.log(detcov))
                     else:
-                        detcov_max = - c_mean*np.log(np.max(detcov) / np.max(norm))
+                        detcov_max = - c_mean*np.max(np.log(detcov / norm))
                     # print("centralized")
                 else:
-                    detcov_max = - c_mean*np.log(np.max(detcov))
+                    detcov_max = - c_mean*np.max(np.log(detcov))
                     # print("individual")
                 reward_dict.append(detcov_max)
         elif self.reward_type == "Mean":
