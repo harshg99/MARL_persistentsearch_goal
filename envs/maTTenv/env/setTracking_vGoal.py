@@ -473,16 +473,21 @@ class setTrackingEnvGoal(setTrackingEnv2):
 
         globaldetcov = np.ravel(globaldetcov)
 
+
         norm = None
         for b_target in belief_targets:
             norm = np.ravel([np.log(b_target.cov_limit)])
 
         if norm is None:
             r_detcov_sum = - np.mean(np.log(globaldetcov))
+            r_detcov_max = - np.max(np.log(globaldetcov))
         else:
             r_detcov_sum = - np.mean(np.log(globaldetcov)/norm)
-        reward = c_mean * r_detcov_sum
+            r_detcov_max = - np.max(np.log(globaldetcov)/norm)
+        reward_mean = c_mean * r_detcov_sum
+        reward_max = c_mean * r_detcov_max
 
+        reward = reward_mean
         ## discretize grid
         # grid = torch.zeros(self.MAP.mapmax[0], self.MAP.mapmax[1])
         ## find occupied cells by all agent's sensor radius
@@ -527,7 +532,14 @@ class setTrackingEnvGoal(setTrackingEnv2):
                     detcov_max = - c_mean * np.log(detcov).mean()
 
                 reward_dict.append( detcov_max)
-
+        elif self.reward_type == "MaxGlobal":
+            for _, _ in enumerate(self.agents):
+                reward_dict.append(reward_max)
+            reward = reward_max
+        elif self.reward_type == "MeanGlobal":
+            for _, _ in enumerate(self.agents):
+                reward_dict.append(reward_mean)
+            reward = reward_mean
         mean_nlogdetcov = None
         if not (is_training):
             logdetcov = [np.log(LA.det(b_target.cov)) for b_target in belief_targets[:nb_targets]]
