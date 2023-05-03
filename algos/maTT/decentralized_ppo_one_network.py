@@ -139,10 +139,8 @@ def decentralized_ppo(envs, model, args, run_name, notes=None):
                 envs.envs[0].render()
             # TRY NOT TO MODIFY: execute the game and log data.
             next_obs, reward, done, info = envs.step(action_dict)
-            if "reward_all" in info:
-                rewards[step] = torch.tensor(np.stack(info['reward_all'])).to(device)
-            else:
-                rewards[step] = torch.tensor(np.repeat(reward,  args.nb_agents, axis=0).reshape(args.num_envs, args.nb_agents)).to(device)
+            if "reward_all" in info[0]:
+                rewards[step] = torch.tensor(np.stack([info[j]['reward_all'] for j in range(args.num_envs)])).to(device)
             metrics[step] = torch.from_numpy(np.stack([inf['metrics'] for inf in info]))
             next_done = torch.Tensor(done).to(device)
             if torch.sum(next_done).item() == args.num_envs:
