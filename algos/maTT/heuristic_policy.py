@@ -164,7 +164,7 @@ def parse_args():
     parser.add_argument('--env', help='environment ID', default='setTracking-v2')
     parser.add_argument('--map', type=str, default="emptyMed")
     parser.add_argument('--nb_agents', type=int, default=4)
-    parser.add_argument('--num_envs', type=int, default=1)
+    parser.add_argument('--num_envs', type=int, default=2)
     parser.add_argument('--nb_targets', type=int, default=4)
     parser.add_argument('--mode', choices=['train', 'test', 'test-behavior'], default='train')
     parser.add_argument('--record',type=int, default=1)
@@ -201,7 +201,7 @@ def run_episode(env, args, policy):
             agents = env.envs[i].agents
             action_map = env.envs[i].action_map
             agent_keys = env.envs[i].observation_space.keys()
-            if policy.type == 'cen':
+            if policy.type == 'caen':
                 action_dict[i] = policy.act(agents, action_map, agent_keys)
             else:
                 for j, key in enumerate(agent_keys):
@@ -212,8 +212,8 @@ def run_episode(env, args, policy):
             env.envs[0].render()
         # TRY NOT TO MODIFY: execute the game and log data.
         next_obs, reward, done, info = env.step(action_dict)
-        if "reward_all" in info:
-            rewards[step] = np.stack(info['reward_all'])
+        if "reward_all" in info[0]:
+            rewards[step] = np.stack([info[j]['reward_all'] for j in range(args.num_envs)])
 
         metrics[step] = np.stack([inf['metrics'] for inf in info])
         dones[step] = done
@@ -241,7 +241,8 @@ if __name__ =="__main__":
                     is_training = True,
                     num_envs = args.num_envs,
                     scaled = False,
-                    reward_type = args.reward_type
+                    reward_type = args.reward_type,
+                    test = True
                     )
 
 
