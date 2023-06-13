@@ -28,9 +28,11 @@ from trajax import optimizers
 import functools
 import jax
 import jax.numpy as jnp
+from envs.maTTenv.util import get_uncertainty_map
+from matplotlib import pyplot as plt
 
 class Agent(object):
-    def __init__(self, agent_id, dim, sampling_period, limit, collision_func, margin=METADATA['margin'],KFBelief = None):
+    def __init__(self, agent_id, dim, sampling_period, limit, collision_func, margin=METADATA['margin'],KFBelief = None, MAP = None):
         self.agent_id = agent_id
         self.dim = dim
         self.sampling_period = sampling_period
@@ -38,7 +40,16 @@ class Agent(object):
         self.collision_func = collision_func
         self.margin = margin
         self.belief = KFBelief
-        self.coverage_map = None
+        if MAP is None:
+            self.coverage_map = None
+            self.uncertainty_map = None
+            self.position_expected_map = None
+            self.other_agents_position = None
+        else:
+            self.coverage_map = np.zeros(np.array(MAP.mapmax) - np.array(MAP.mapmin))
+            self.uncertainty_map = np.zeros(np.array(MAP.mapmax) - np.array(MAP.mapmin))
+            self.position_expected_map = np.zeros(np.array(MAP.mapmax) - np.array(MAP.mapmin))
+            self.other_agents_position = np.zeros(np.array(MAP.mapmax) - np.array(MAP.mapmin))
 
     def setupBelief(self,belief):
         #List of belief over all targets
@@ -48,6 +59,38 @@ class Agent(object):
     def updateBelief(self,targetID = None,z_t=None):
         if targetID is not None and z_t is not None:
             self.belief[targetID].update(z_t,self.state)
+
+
+    def update_unc_map(self, MAP = None, agents = None):
+        # Update the uncertainty map
+
+        if MAP is not None:
+            # update uncertainty map of the agent based on all the beliefs of the targets
+            map_size = np.array(MAP.mapmax) - np.array(MAP.mapmin)
+            self.uncertainty_map = np.zeros(map_size)
+            self.position_expected_map = np.zeros(map_size)
+            self.other_agents_position = np.zeros(map_size)
+
+            for targetID in range(len(self.belief)):
+                mean = self.belief[targetID].state[:2]
+                cov = self.belief[targetID].cov[:2, :2]
+
+                belief_map, position_mask = get_uncertainty_map(mean.copy(), cov.copy(), MAP, distance_clip = 2.0)
+                self.uncertainty_map += belief_map.copy()
+                self.position_expected_map += position_mask.copy()
+            self.uncertainty_map = self.uncertainty_map / self.uncertainty_map.sum()
+            self.uncertainty_map = self.uncertainty_map / self.uncertainty_map.max()
+            self.position_expected_map = np.clip(self.position_expected_map, 0, 1)
+
+            if agents is not None:
+                for agent in agents:
+                    if agent.agent_id == self.agent_id:
+                        continue
+                    cov = np.ones((2, 2))
+                    mean  = agent.state[:2]
+                    _, position_mask = get_uncertainty_map(mean.copy(), cov.copy(), MAP, distance_clip = 2.0)
+                    self.other_agents_position += position_mask
+                self.other_agents_position = np.clip(position_mask, 0, 1)
 
     def update_coverage_map(self,rectangle_map,decay):
         if self.coverage_map is not None:
@@ -392,8 +435,8 @@ class AgentDoubleInt2D_Nonlinear(AgentDoubleInt2D):
 
 class AgentSE2Goal(Agent):
     def __init__(self, agent_id, dim, sampling_period, limit, collision_func,
-                 margin=METADATA['margin'], policy=None,horizon= 2.0):
-        super().__init__(agent_id, dim, sampling_period, limit, collision_func, margin=margin)
+                 margin=METADATA['margin'], policy=None,horizon= 2.0, MAP = None):
+        super().__init__(agent_id, dim, sampling_period, limit, collision_func, margin=margin, MAP=MAP)
         self.policy = policy
         self.horizon = horizon
 
@@ -465,6 +508,21 @@ class AgentSE2Goal(Agent):
 
         return is_col
 
+    def get_image_observation(self):
+        '''
+
+        :return:Image observation comprising the target uncertainties [30% and 60%], coverage map
+        '''
+
+        images = [self.uncertainty_map,self.position_expected_map,self.coverage_map, self.other_agents_position]
+
+        # visualise these as images
+        for img in images:
+            plt.figure()
+            plt.imshow(img)
+
+        plt.show()
+        return np.stack(images,axis=2)
 
 class SE2Planner:
 
