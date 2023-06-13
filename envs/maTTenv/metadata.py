@@ -174,6 +174,7 @@ METADATA_Goal = {
         'dT': 1.0, # Time taken to reach the goal
         'sampling_period' : 0.10, # Time taken for low level controller
         "step_goal": True, # Steps to goal instead of solving the optiization problem
+        "observation_type":"image" # continuous or image
     }
 
 METADATAS = {

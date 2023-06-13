@@ -127,3 +127,27 @@ def vw_to_xydot(v, w, theta):
         x_dot = v/w * (np.sin(theta + w) - np.sin(theta))
         y_dot = v/w * (np.cos(theta) - np.cos(theta + w))
     return x_dot, y_dot
+
+def get_uncertainty_map(mean, cov, MAP, distance_clip = 4.0):
+    """
+    Get the uncertainty map from the mean and covariance of a Gaussian distribution.
+    mean: nd array(2,1)
+    cov: nd array(2,2)
+    map_size: tuple(2,)
+    """
+    map_size = np.array(MAP.mapmax) - np.array(MAP.mapmin)
+    x = np.linspace(0, map_size[0]-1, map_size[0])
+    y = np.linspace(0, map_size[1]-1, map_size[1])
+    xx, yy = np.meshgrid(x, y)
+    pos = np.expand_dims(np.dstack((xx, yy)), axis=-1)
+
+    mean = np.reshape(mean, (1,1,2,1))
+    cov += np.eye(2) * 1e-6
+
+    distance = 0.5 * (pos - mean).transpose((0,1,3,2)) @ np.linalg.inv(cov) @ (pos - mean)
+    pdf =  1/(2*np.pi*np.sqrt(np.linalg.det(cov))) * np.exp(-distance.squeeze())
+
+    distance = np.sqrt(np.square(pos - mean).squeeze().sum(axis=-1)).squeeze()
+    position_mask = np.asarray(distance < distance_clip, dtype=np.float32)
+
+    return pdf, position_mask
