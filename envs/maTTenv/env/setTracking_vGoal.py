@@ -83,10 +83,18 @@ class setTrackingEnvGoal(setTrackingEnv2):
 
         self.communication_range = METADATA['comms_r']
 
-        observation_space = spaces.Box(np.tile(self.limit['state'][0], (self.num_targets, 1)),
-                                       np.tile(self.limit['state'][1], (self.num_targets, 1)), dtype=np.float32)
-        self.observation_space = {f"agent-{i}": observation_space for i in range(self.nb_agents)}
-        self.observation_space = spaces.Dict(self.observation_space)
+        if METADATA['observation_type'] == 'continuous':
+            observation_space = spaces.Box(np.tile(self.limit['state'][0], (self.num_targets, 1)),
+                                           np.tile(self.limit['state'][1], (self.num_targets, 1)), dtype=np.float32)
+            self.observation_space = {f"agent-{i}": observation_space for i in range(self.nb_agents)}
+            self.observation_space = spaces.Dict(self.observation_space)
+        else:
+            shape = np.array(self.MAP.mapmax) - np.array(self.MAP.mapmin)
+            shape = tuple(list(shape) + [4])
+            observation_space = spaces.Box(low=0, high=1, shape=shape, dtype=np.float32)
+            self.observation_space = {f"agent-{i}": observation_space for i in range(self.nb_agents)}
+            self.observation_space = spaces.Dict(self.observation_space)
+
         self.targetA = np.concatenate((np.concatenate((np.eye(2), self.sampling_period * np.eye(2)), axis=1),
                                        [[0, 0, 1, 0], [0, 0, 0, 1]]))
         self.target_noise_cov = METADATA['const_q'] * np.concatenate((
@@ -133,17 +141,22 @@ class setTrackingEnvGoal(setTrackingEnv2):
                                 dim=self.agent_dim, sampling_period=self.sampling_period,
                                 limit=self.limit['agent'],
                                 collision_func=lambda x: map_utils.is_collision(self.MAP, x),
-                                horizon = self.dT)
+                                horizon = self.dT,
+                                MAP = self.MAP)
                        for i in range(self.num_agents)]
 
     def reset(self):
-        obs = super(setTrackingEnvGoal, self).reset()
+        _ = super(setTrackingEnvGoal, self).reset()
 
         for i in range(self.num_agents):
             self.agents[i].state[-1] += np.pi
             self.agents[i].state[-1] = int(self.agents[i].state[-1] / (np.pi / 2.0)) * np.pi
 
         obs_dict = {}
+        # for i in range(self.num_agents):
+        #     self.agents[i].update_unc_map(MAP = self.MAP, agents = self.agents.copy())
+        #     self.agents[i].coverage_map = np.zeros(shape=self.MAP.mapmax)
+
         for kk in range(self.nb_agents):
             obs_dict[self.agents[kk].agent_id] = self.observe_single(kk)
 
@@ -184,6 +197,7 @@ class setTrackingEnvGoal(setTrackingEnv2):
                 ii,  action_vw=self.action_map[action_dict[agent_id]],
                 isObserved=observed[ii]
             )
+
         # Get all rewards after all agents and targets move (t -> t+1)
 
         done = False
@@ -197,30 +211,35 @@ class setTrackingEnvGoal(setTrackingEnv2):
 
     def observe_single(self,agentID,action_vw = None,isObserved = None):
         observation = []
-        for jj in range(self.nb_targets):
-            r, alpha = util.relative_distance_polar(self.agents[agentID].belief[jj].state[:2],
-                                                    xy_base=self.agents[agentID].state[:2],
-                                                    theta_base=self.agents[agentID].state[2])
-            if action_vw is None:
-                r_dot_b,alpha_dot_b = 0.0,0.0
-            else:
-                r_dot_b, alpha_dot_b = util.relative_velocity_polar(
-                    self.agents[agentID].belief[jj].state[:2],
-                    self.agents[agentID].belief[jj].state[2:],
-                    self.agents[agentID].state[:2], self.agents[agentID].state[-1],
-                    action_vw[0], action_vw[1])
+        if METADATA['observation_type'] == 'continuous':
+            for jj in range(self.nb_targets):
+                r, alpha = util.relative_distance_polar(self.agents[agentID].belief[jj].state[:2],
+                                                        xy_base=self.agents[agentID].state[:2],
+                                                        theta_base=self.agents[agentID].state[2])
+                if action_vw is None:
+                    r_dot_b,alpha_dot_b = 0.0,0.0
+                else:
+                    r_dot_b, alpha_dot_b = util.relative_velocity_polar(
+                        self.agents[agentID].belief[jj].state[:2],
+                        self.agents[agentID].belief[jj].state[2:],
+                        self.agents[agentID].state[:2], self.agents[agentID].state[-1],
+                        action_vw[0], action_vw[1])
 
-            logdetcov = np.log(LA.det(self.agents[agentID].belief[jj].cov))
-            if action_vw is None:
-                observed = 0.0
-            else:
-                observed = float(isObserved[jj])
+                logdetcov = np.log(LA.det(self.agents[agentID].belief[jj].cov))
+                if action_vw is None:
+                    observed = 0.0
+                else:
+                    observed = float(isObserved[jj])
 
-            observation.append([self.agents[agentID].state[0]/self.MAP.mapmax[0],
-                                self.agents[agentID].state[1]/self.MAP.mapmax[0],
-                                r, alpha, r_dot_b, alpha_dot_b, logdetcov, observed])
-
+                observation.append([self.agents[agentID].state[0]/self.MAP.mapmax[0],
+                                    self.agents[agentID].state[1]/self.MAP.mapmax[0],
+                                    r, alpha, r_dot_b, alpha_dot_b, logdetcov, observed])
+        elif METADATA['observation_type'] == 'image':
+            # TODO: append image observations of other agents in the scene
+            observation_agent = np.array(self.agents[agentID].get_image_observation())
+            observation = observation_agent
         return torch.tensor(observation,dtype=torch.float32)
+
 
     def step_single(self,planners_dict):
         '''
@@ -285,11 +304,11 @@ class setTrackingEnvGoal(setTrackingEnv2):
                         observed[ii][jj] = obs
                         if obs:  # if observed, update the target belief.
                             # Update agents indivuudla beliefs based on observation
-                            self.agents[ii].updateBelief(targetID=jj, z_t=z_t)
+                            self.agents[ii].updateBelief(targetID=jj, z_t=z_t, MAP=self.MAP)
 
                             # Update global belief
                             self.belief_targets[jj].update(z_t, self.agents[ii].state)
-
+                    self.agents[agent_id].update_unc_map(MAP = self.MAP, agents = self.agents.copy())
                 coverage_reward = np.array(self.update_global_coverage())
                 reward, reward_dict, done, mean_nlogdetcov = self.get_reward(observed, self.is_training)
 
@@ -353,7 +372,7 @@ class setTrackingEnvGoal(setTrackingEnv2):
 
                         # Update global belief
                         self.belief_targets[jj].update(z_t, self.agents[ii].state)
-
+                self.agents[agent_id].update_unc_map(MAP = self.MAP, agents=self.agents.copy())
             coverage_reward = np.array(self.update_global_coverage())
             reward, reward_dict, done, mean_nlogdetcov = self.get_reward(observed, self.is_training)
 
